@@ -1,0 +1,67 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Design tokens — mirror `frontend/tailwind.config.ts` exactly.
+   navy + ink + a single amber accent (no purple/cyan gradients). */
+:root {
+  color-scheme: dark;
+
+  /* navy */
+  --color-navy-50: #eef4ff;
+  --color-navy-100: #d8e4ff;
+  --color-navy-200: #b4c8ff;
+  --color-navy-300: #86a5ff;
+  --color-navy-400: #5b7bf5;
+  --color-navy-500: #3e59db;
+  --color-navy-600: #3044b3;
+  --color-navy-700: #27358d;
+  --color-navy-800: #1d2764;
+  --color-navy-900: #11183c;
+
+  /* ink */
+  --color-ink-50: #f4f7fb;
+  --color-ink-100: #e8eef7;
+  --color-ink-200: #c8d4e6;
+  --color-ink-300: #9caec9;
+  --color-ink-400: #6f84a6;
+  --color-ink-500: #506684;
+  --color-ink-600: #3d4f69;
+  --color-ink-700: #2e3b4f;
+  --color-ink-800: #1d2635;
+  --color-ink-900: #0d1320;
+
+  /* accent (single) */
+  --color-accent-50: #fff7eb;
+  --color-accent-100: #ffeed0;
+  --color-accent-200: #ffd89a;
+  --color-accent-300: #ffbd5c;
+  --color-accent-400: #f89b24;
+  --color-accent-500: #e47f0e;
+  --color-accent-600: #c36309;
+  --color-accent-700: #9c490b;
+  --color-accent-800: #7e3910;
+  --color-accent-900: #672f11;
+}
+
+@layer base {
+  body {
+    @apply bg-ink-900 text-ink-50 antialiased;
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+      "Helvetica Neue", Arial, sans-serif;
+  }
+
+  ::selection {
+    @apply bg-accent-500/30 text-ink-50;
+  }
+}
+
+@layer utilities {
+  /* Monospaced numerals so amounts don't jitter while updating.
+     Mirrors Tailwind's built-in `tabular-nums` utility; the extra
+     `font-feature-settings` hint improves rendering in some fonts. */
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+}
