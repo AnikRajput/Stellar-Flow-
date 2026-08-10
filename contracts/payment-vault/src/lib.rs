@@ -42,7 +42,14 @@ impl PaymentVaultContract {
         let next_balance = checked_add(&env, current_balance, amount);
         write_vault_balance(&env, project_id, next_balance);
 
-        events::publish_funds_held(&env, project_id, milestone_id, amount);
+        events::publish_funds_held(
+            &env,
+            project_id,
+            milestone_id,
+            &from,
+            amount,
+            env.ledger().timestamp(),
+        );
     }
 
     pub fn release_funds(
@@ -71,7 +78,14 @@ impl PaymentVaultContract {
         let next_balance = checked_sub(&env, current_balance, amount);
         write_vault_balance(&env, project_id, next_balance);
 
-        events::publish_funds_released(&env, project_id, milestone_id, amount);
+        events::publish_funds_released(
+            &env,
+            project_id,
+            milestone_id,
+            &to,
+            amount,
+            env.ledger().timestamp(),
+        );
     }
 
     pub fn refund_funds(
@@ -99,7 +113,13 @@ impl PaymentVaultContract {
         let next_balance = checked_sub(&env, current_balance, amount);
         write_vault_balance(&env, project_id, next_balance);
 
-        events::publish_funds_refunded(&env, project_id, amount);
+        events::publish_funds_refunded(
+            &env,
+            project_id,
+            &to,
+            amount,
+            env.ledger().timestamp(),
+        );
     }
 
     pub fn get_vault_balance(env: Env, project_id: u32) -> i128 {

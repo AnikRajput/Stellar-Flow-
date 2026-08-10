@@ -5,7 +5,14 @@ use soroban_sdk::{
     vec, Address, Env, IntoVal, Symbol,
 };
 
-use crate::{errors::Error, DataKey, Project, ProjectFactoryContract, ProjectFactoryContractClient};
+use crate::{
+    errors::Error,
+    events::{ProjectCreatedEvent, ProjectPausedEvent},
+    DataKey,
+    Project,
+    ProjectFactoryContract,
+    ProjectFactoryContractClient,
+};
 
 fn setup() -> (
     Env,
@@ -77,8 +84,15 @@ fn create_project_success() {
             &env,
             (
                 contract_id.clone(),
-                (Symbol::new(&env, "PROJECT_CREATED"), 1u32).into_val(&env),
-                expected_project.clone().into_val(&env),
+                (Symbol::new(&env, "PROJECT_CREATED"),).into_val(&env),
+                ProjectCreatedEvent {
+                    project_id: 1,
+                    client: project_client.clone(),
+                    freelancer: freelancer.clone(),
+                    total_amount: 1_000,
+                    timestamp: env.ledger().timestamp(),
+                }
+                .into_val(&env),
             ),
         ]
     );
@@ -186,8 +200,25 @@ fn pause_project_by_admin_success() {
             &env,
             (
                 contract_id.clone(),
-                (Symbol::new(&env, "PROJECT_PAUSED"), project_id).into_val(&env),
-                true.into_val(&env),
+                (Symbol::new(&env, "PROJECT_CREATED"),).into_val(&env),
+                ProjectCreatedEvent {
+                    project_id,
+                    client: project_client.clone(),
+                    freelancer: freelancer.clone(),
+                    total_amount: 1_000,
+                    timestamp: env.ledger().timestamp(),
+                }
+                .into_val(&env),
+            ),
+            (
+                contract_id.clone(),
+                (Symbol::new(&env, "PROJECT_PAUSED"),).into_val(&env),
+                ProjectPausedEvent {
+                    project_id,
+                    admin: admin.clone(),
+                    timestamp: env.ledger().timestamp(),
+                }
+                .into_val(&env),
             ),
         ]
     );

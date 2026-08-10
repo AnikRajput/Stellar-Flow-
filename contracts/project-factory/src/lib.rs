@@ -56,8 +56,8 @@ impl ProjectFactoryContract {
         let next_project_id = get_project_count_value(&env).saturating_add(1);
         let project = Project {
             project_id: next_project_id,
-            client,
-            freelancer,
+            client: client.clone(),
+            freelancer: freelancer.clone(),
             token,
             total_amount,
             paused: false,
@@ -72,7 +72,14 @@ impl ProjectFactoryContract {
 
         // TODO(phase 4): cross-contract call into Escrow
 
-        events::publish_project_created(&env, next_project_id, &project);
+        events::publish_project_created(
+            &env,
+            next_project_id,
+            &client,
+            &freelancer,
+            total_amount,
+            env.ledger().timestamp(),
+        );
 
         next_project_id
     }
@@ -96,7 +103,7 @@ impl ProjectFactoryContract {
             .persistent()
             .set(&DataKey::Project(project_id), &project);
 
-        events::publish_project_paused(&env, project_id, true);
+        events::publish_project_paused(&env, project_id, &admin, env.ledger().timestamp());
     }
 
     pub fn unpause_project(env: Env, admin: Address, project_id: u32) {
@@ -109,8 +116,6 @@ impl ProjectFactoryContract {
         env.storage()
             .persistent()
             .set(&DataKey::Project(project_id), &project);
-
-        events::publish_project_paused(&env, project_id, false);
     }
 
     pub fn transfer_admin(env: Env, current_admin: Address, new_admin: Address) {

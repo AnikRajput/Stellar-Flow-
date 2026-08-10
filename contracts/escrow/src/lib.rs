@@ -12,6 +12,7 @@ pub use errors::Error;
 pub use storage::DataKey;
 pub use types::{Milestone, MilestoneStatus, Project, ProjectStatus};
 
+use events::DisputeOutcome;
 use soroban_sdk::{
     contract, contractclient, contractimpl, panic_with_error, Address, Env, String,
 };
@@ -144,7 +145,13 @@ impl EscrowContract {
             .persistent()
             .set(&DataKey::MilestoneAmountSum(project_id), &next_sum);
 
-        events::publish_milestone_created(&env, project_id, milestone_id, amount);
+        events::publish_milestone_created(
+            &env,
+            project_id,
+            milestone_id,
+            amount,
+            env.ledger().timestamp(),
+        );
 
         milestone_id
     }
@@ -172,7 +179,13 @@ impl EscrowContract {
         project.escrow_balance = next_balance;
         write_project(&env, &project);
 
-        events::publish_funds_deposited(&env, project_id, amount);
+        events::publish_funds_deposited(
+            &env,
+            project_id,
+            &client,
+            amount,
+            env.ledger().timestamp(),
+        );
     }
 
     pub fn submit_milestone(env: Env, freelancer: Address, project_id: u32, milestone_id: u32) {
@@ -191,7 +204,13 @@ impl EscrowContract {
         milestone.status = MilestoneStatus::Submitted;
         write_milestone(&env, project_id, &milestone);
 
-        events::publish_milestone_submitted(&env, project_id, milestone_id);
+        events::publish_milestone_submitted(
+            &env,
+            project_id,
+            milestone_id,
+            &freelancer,
+            env.ledger().timestamp(),
+        );
     }
 
     pub fn approve_milestone(env: Env, client: Address, project_id: u32, milestone_id: u32) {
@@ -215,7 +234,13 @@ impl EscrowContract {
         milestone.status = MilestoneStatus::Approved;
         write_milestone(&env, project_id, &milestone);
 
-        events::publish_milestone_approved(&env, project_id, milestone_id);
+        events::publish_milestone_approved(
+            &env,
+            project_id,
+            milestone_id,
+            &client,
+            env.ledger().timestamp(),
+        );
     }
 
     pub fn release_payment(env: Env, project_id: u32, milestone_id: u32) {
@@ -250,11 +275,21 @@ impl EscrowContract {
         project.escrow_balance = checked_sub(&env, project.escrow_balance, milestone.amount);
         write_milestone(&env, project_id, &milestone);
 
+        let timestamp = env.ledger().timestamp();
+        events::publish_payment_released(
+            &env,
+            project_id,
+            milestone_id,
+            &project.freelancer,
+            milestone.amount,
+            timestamp,
+        );
+
         let paid_count = increment_paid_milestones(&env, project_id);
         if paid_count == project.milestone_count {
             project.status = ProjectStatus::Completed;
             write_project(&env, &project);
-            events::publish_project_completed(&env, project_id);
+            events::publish_project_completed(&env, project_id, timestamp);
         } else {
             write_project(&env, &project);
         }
@@ -285,7 +320,7 @@ impl EscrowContract {
             id: dispute_id,
             project_id,
             milestone_id,
-            initiator,
+            initiator: initiator.clone(),
             reason: reason.clone(),
             resolved: false,
         };
@@ -299,8 +334,14 @@ impl EscrowContract {
             .persistent()
             .set(&DataKey::Dispute(dispute_id), &dispute);
 
-        events::publish_dispute_opened(&env, dispute_id, project_id, milestone_id);
-        events::publish_dispute_reason(&env, dispute_id, &reason);
+        events::publish_dispute_opened(
+            &env,
+            project_id,
+            milestone_id,
+            &initiator,
+            &reason,
+            env.ledger().timestamp(),
+        );
 
         dispute_id
     }
@@ -324,23 +365,19 @@ impl EscrowContract {
         let mut milestone = read_milestone(&env, dispute.project_id, dispute.milestone_id);
 
         dispute.resolved = true;
-        project.status = if release_to_freelancer {
-            ProjectStatus::Completed
-        } else {
-            ProjectStatus::Cancelled
-        };
-        milestone.status = if release_to_freelancer {
-            MilestoneStatus::Paid
-        } else {
-            MilestoneStatus::Cancelled
-        };
-
-        if release_to_freelancer {
+        let outcome = if release_to_freelancer {
+            project.status = ProjectStatus::Completed;
+            milestone.status = MilestoneStatus::Paid;
             if project.escrow_balance < milestone.amount {
                 panic_with_error!(&env, Error::InvalidState);
             }
             project.escrow_balance = checked_sub(&env, project.escrow_balance, milestone.amount);
-        }
+            DisputeOutcome::ReleasedToFreelancer
+        } else {
+            project.status = ProjectStatus::Cancelled;
+            milestone.status = MilestoneStatus::Cancelled;
+            DisputeOutcome::RefundedToClient
+        };
 
         env.storage()
             .persistent()
@@ -348,9 +385,16 @@ impl EscrowContract {
         write_milestone(&env, dispute.project_id, &milestone);
         write_project(&env, &project);
 
-        events::publish_dispute_resolved(&env, dispute_id, release_to_freelancer);
+        let timestamp = env.ledger().timestamp();
+        events::publish_dispute_resolved(
+            &env,
+            dispute.project_id,
+            dispute_id,
+            outcome,
+            timestamp,
+        );
         if release_to_freelancer {
-            events::publish_project_completed(&env, dispute.project_id);
+            events::publish_project_completed(&env, dispute.project_id, timestamp);
         }
     }
 
@@ -365,7 +409,7 @@ impl EscrowContract {
         project.status = ProjectStatus::Cancelled;
         write_project(&env, &project);
 
-        events::publish_project_cancelled(&env, project_id);
+        events::publish_project_cancelled(&env, project_id, &caller, env.ledger().timestamp());
     }
 
     pub fn refund(env: Env, project_id: u32) {
@@ -393,7 +437,13 @@ impl EscrowContract {
         project.escrow_balance = checked_sub(&env, project.escrow_balance, refunded_amount);
         write_project(&env, &project);
 
-        events::publish_refund_issued(&env, project_id, refunded_amount);
+        events::publish_refund_issued(
+            &env,
+            project_id,
+            &project.client,
+            refunded_amount,
+            env.ledger().timestamp(),
+        );
     }
 
     pub fn pause(env: Env, admin: Address) {
