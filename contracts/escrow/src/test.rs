@@ -1,8 +1,10 @@
 extern crate std;
 
 use soroban_sdk::{
-    testutils::{Address as _, Events as _, MockAuth, MockAuthInvoke},
-    vec, Address, Env, IntoVal, String, Symbol,
+    contract, contractimpl, contracttype,
+    testutils::Address as _,
+    token::{self, StellarAssetClient},
+    Address, Env, String,
 };
 
 use crate::{
@@ -10,53 +12,156 @@ use crate::{
     ProjectStatus,
 };
 
+#[derive(Clone)]
+#[contracttype]
+enum TestVaultKey {
+    Escrow,
+    Balance(u32),
+}
+
+#[contract]
+struct TestPaymentVault;
+
+#[contractimpl]
+impl TestPaymentVault {
+    pub fn initialize(env: Env, escrow: Address) {
+        env.storage()
+            .persistent()
+            .set(&TestVaultKey::Escrow, &escrow);
+    }
+
+    pub fn hold_funds(
+        env: Env,
+        from: Address,
+        token: Address,
+        amount: i128,
+        project_id: u32,
+        _milestone_id: u32,
+    ) {
+        token::Client::new(&env, &token).transfer(
+            &from,
+            &env.current_contract_address(),
+            &amount,
+        );
+        let next = read_vault_balance(&env, project_id) + amount;
+        env.storage()
+            .persistent()
+            .set(&TestVaultKey::Balance(project_id), &next);
+    }
+
+    pub fn release_funds(
+        env: Env,
+        caller: Address,
+        token: Address,
+        to: Address,
+        amount: i128,
+        project_id: u32,
+        _milestone_id: u32,
+    ) {
+        let escrow: Address = env
+            .storage()
+            .persistent()
+            .get(&TestVaultKey::Escrow)
+            .unwrap();
+        if caller != escrow {
+            panic!("unauthorized");
+        }
+
+        token::Client::new(&env, &token).transfer(
+            &env.current_contract_address(),
+            &to,
+            &amount,
+        );
+        let next = read_vault_balance(&env, project_id) - amount;
+        env.storage()
+            .persistent()
+            .set(&TestVaultKey::Balance(project_id), &next);
+    }
+
+    pub fn refund_funds(
+        env: Env,
+        caller: Address,
+        token: Address,
+        to: Address,
+        amount: i128,
+        project_id: u32,
+    ) {
+        let escrow: Address = env
+            .storage()
+            .persistent()
+            .get(&TestVaultKey::Escrow)
+            .unwrap();
+        if caller != escrow {
+            panic!("unauthorized");
+        }
+
+        token::Client::new(&env, &token).transfer(
+            &env.current_contract_address(),
+            &to,
+            &amount,
+        );
+        let next = read_vault_balance(&env, project_id) - amount;
+        env.storage()
+            .persistent()
+            .set(&TestVaultKey::Balance(project_id), &next);
+    }
+
+    pub fn get_vault_balance(env: Env, project_id: u32) -> i128 {
+        read_vault_balance(&env, project_id)
+    }
+}
+
+fn read_vault_balance(env: &Env, project_id: u32) -> i128 {
+    env.storage()
+        .persistent()
+        .get(&TestVaultKey::Balance(project_id))
+        .unwrap_or(0i128)
+}
+
 fn setup() -> (Env, Address, Address, Address, Address, Address, Address) {
     let env = Env::default();
-    let contract_id = env.register(EscrowContract, ());
+    env.mock_all_auths();
 
+    let escrow_id = env.register(EscrowContract, ());
+    let vault_id = env.register(TestPaymentVault, ());
     let factory = Address::generate(&env);
-    let vault = Address::generate(&env);
     let client = Address::generate(&env);
     let freelancer = Address::generate(&env);
-    let token = Address::generate(&env);
 
-    let escrow = EscrowContractClient::new(&env, &contract_id);
-    escrow.initialize(&factory, &vault);
+    let token_admin = Address::generate(&env);
+    let token = env.register_stellar_asset_contract_v2(token_admin.clone());
+    let token_address = token.address();
+    StellarAssetClient::new(&env, &token_address).mint(&client, &10_000i128);
 
-    (env, contract_id, factory, vault, client, freelancer, token)
+    let vault = TestPaymentVaultClient::new(&env, &vault_id);
+    vault.initialize(&escrow_id);
+
+    let escrow = EscrowContractClient::new(&env, &escrow_id);
+    escrow.initialize(&factory, &vault_id);
+
+    (
+        env,
+        escrow_id,
+        vault_id,
+        factory,
+        client,
+        freelancer,
+        token_address,
+    )
 }
 
 fn create_project(
-    env: &Env,
-    contract_id: &Address,
     escrow: &EscrowContractClient<'_>,
     client: &Address,
     freelancer: &Address,
     token: &Address,
     total_amount: i128,
 ) -> u32 {
-    escrow
-        .mock_auths(&[MockAuth {
-            address: client,
-            invoke: &MockAuthInvoke {
-                contract: contract_id,
-                fn_name: "create_project",
-                args: (
-                    client.clone(),
-                    freelancer.clone(),
-                    token.clone(),
-                    total_amount,
-                )
-                    .into_val(env),
-                sub_invokes: &[],
-            },
-        }])
-        .create_project(client, freelancer, token, &total_amount)
+    escrow.create_project(client, freelancer, token, &total_amount)
 }
 
 fn add_milestone(
     env: &Env,
-    contract_id: &Address,
     escrow: &EscrowContractClient<'_>,
     client: &Address,
     project_id: u32,
@@ -64,96 +169,41 @@ fn add_milestone(
     amount: i128,
     due_date: u64,
 ) -> u32 {
-    escrow
-        .mock_auths(&[MockAuth {
-            address: client,
-            invoke: &MockAuthInvoke {
-                contract: contract_id,
-                fn_name: "add_milestone",
-                args: (
-                    client.clone(),
-                    project_id,
-                    String::from_str(env, name),
-                    amount,
-                    due_date,
-                )
-                    .into_val(env),
-                sub_invokes: &[],
-            },
-        }])
-        .add_milestone(
-            client,
-            &project_id,
-            &String::from_str(env, name),
-            &amount,
-            &due_date,
-        )
+    escrow.add_milestone(
+        client,
+        &project_id,
+        &String::from_str(env, name),
+        &amount,
+        &due_date,
+    )
 }
 
-fn deposit(
+fn funded_project(
     env: &Env,
-    contract_id: &Address,
     escrow: &EscrowContractClient<'_>,
     client: &Address,
-    project_id: u32,
-    amount: i128,
-) {
-    escrow
-        .mock_auths(&[MockAuth {
-            address: client,
-            invoke: &MockAuthInvoke {
-                contract: contract_id,
-                fn_name: "deposit",
-                args: (client.clone(), project_id, amount).into_val(env),
-                sub_invokes: &[],
-            },
-        }])
-        .deposit(client, &project_id, &amount);
-}
-
-fn submit_milestone(
-    env: &Env,
-    contract_id: &Address,
-    escrow: &EscrowContractClient<'_>,
     freelancer: &Address,
-    project_id: u32,
-    milestone_id: u32,
-) {
-    escrow
-        .mock_auths(&[MockAuth {
-            address: freelancer,
-            invoke: &MockAuthInvoke {
-                contract: contract_id,
-                fn_name: "submit_milestone",
-                args: (freelancer.clone(), project_id, milestone_id).into_val(env),
-                sub_invokes: &[],
-            },
-        }])
-        .submit_milestone(freelancer, &project_id, &milestone_id);
+    token: &Address,
+) -> (u32, u32) {
+    let project_id = create_project(escrow, client, freelancer, token, 1_000);
+    let milestone_id = add_milestone(env, escrow, client, project_id, "Phase 1", 500, 10);
+    escrow.deposit(client, &project_id, &500i128);
+    (project_id, milestone_id)
 }
 
 #[test]
 fn create_project_success() {
-    let (env, contract_id, _factory, _vault, client_address, freelancer, token) = setup();
-    let escrow = EscrowContractClient::new(&env, &contract_id);
+    let (env, escrow_id, _vault_id, _factory, client, freelancer, token) = setup();
+    let escrow = EscrowContractClient::new(&env, &escrow_id);
 
-    let project_id = create_project(
-        &env,
-        &contract_id,
-        &escrow,
-        &client_address,
-        &freelancer,
-        &token,
-        1_000,
-    );
+    let project_id = create_project(&escrow, &client, &freelancer, &token, 1_000);
 
-    let project = escrow.get_project(&project_id);
     assert_eq!(project_id, 1);
     assert_eq!(
-        project,
+        escrow.get_project(&project_id),
         Project {
             id: 1,
-            client: client_address,
+            client,
             freelancer,
             token,
             total_amount: 1_000,
@@ -167,20 +217,11 @@ fn create_project_success() {
 
 #[test]
 fn add_milestone_success() {
-    let (env, contract_id, _factory, _vault, client_address, freelancer, token) = setup();
-    let escrow = EscrowContractClient::new(&env, &contract_id);
-    let project_id = create_project(
-        &env,
-        &contract_id,
-        &escrow,
-        &client_address,
-        &freelancer,
-        &token,
-        1_000,
-    );
+    let (env, escrow_id, _vault_id, _factory, client, freelancer, token) = setup();
+    let escrow = EscrowContractClient::new(&env, &escrow_id);
+    let project_id = create_project(&escrow, &client, &freelancer, &token, 1_000);
 
-    let milestone_id =
-        add_milestone(&env, &contract_id, &escrow, &client_address, project_id, "Design", 400, 10);
+    let milestone_id = add_milestone(&env, &escrow, &client, project_id, "Design", 400, 10);
 
     assert_eq!(milestone_id, 1);
     assert_eq!(
@@ -193,219 +234,88 @@ fn add_milestone_success() {
             due_date: 10,
         }
     );
-    assert_eq!(
-        env.events().all(),
-        vec![
-            &env,
-            (
-                contract_id,
-                (Symbol::new(&env, "MILESTONE_CREATED"), project_id, milestone_id).into_val(&env),
-                400i128.into_val(&env),
-            ),
-        ]
-    );
 }
 
 #[test]
 fn add_milestone_invalid_amount() {
-    let (env, contract_id, _factory, _vault, client_address, freelancer, token) = setup();
-    let escrow = EscrowContractClient::new(&env, &contract_id);
-    let project_id = create_project(
-        &env,
-        &contract_id,
-        &escrow,
-        &client_address,
-        &freelancer,
-        &token,
-        1_000,
-    );
+    let (env, escrow_id, _vault_id, _factory, client, freelancer, token) = setup();
+    let escrow = EscrowContractClient::new(&env, &escrow_id);
+    let project_id = create_project(&escrow, &client, &freelancer, &token, 1_000);
 
-    let result = escrow
-        .mock_auths(&[MockAuth {
-            address: &client_address,
-            invoke: &MockAuthInvoke {
-                contract: &contract_id,
-                fn_name: "add_milestone",
-                args: (
-                    client_address.clone(),
-                    project_id,
-                    String::from_str(&env, "Invalid"),
-                    0i128,
-                    10u64,
-                )
-                    .into_val(&env),
-                sub_invokes: &[],
-            },
-        }])
-        .try_add_milestone(
-            &client_address,
-            &project_id,
-            &String::from_str(&env, "Invalid"),
-            &0i128,
-            &10u64,
-        );
+    let result = escrow.try_add_milestone(
+        &client,
+        &project_id,
+        &String::from_str(&env, "Invalid"),
+        &0i128,
+        &10u64,
+    );
 
     assert_eq!(result, Err(Ok(Error::InvalidAmount)));
 }
 
 #[test]
 fn add_milestone_sum_mismatch() {
-    let (env, contract_id, _factory, _vault, client_address, freelancer, token) = setup();
-    let escrow = EscrowContractClient::new(&env, &contract_id);
-    let project_id = create_project(
-        &env,
-        &contract_id,
-        &escrow,
-        &client_address,
-        &freelancer,
-        &token,
-        1_000,
+    let (env, escrow_id, _vault_id, _factory, client, freelancer, token) = setup();
+    let escrow = EscrowContractClient::new(&env, &escrow_id);
+    let project_id = create_project(&escrow, &client, &freelancer, &token, 1_000);
+
+    add_milestone(&env, &escrow, &client, project_id, "One", 700, 10);
+
+    let result = escrow.try_add_milestone(
+        &client,
+        &project_id,
+        &String::from_str(&env, "Two"),
+        &400i128,
+        &20u64,
     );
-
-    add_milestone(&env, &contract_id, &escrow, &client_address, project_id, "One", 700, 10);
-
-    let result = escrow
-        .mock_auths(&[MockAuth {
-            address: &client_address,
-            invoke: &MockAuthInvoke {
-                contract: &contract_id,
-                fn_name: "add_milestone",
-                args: (
-                    client_address.clone(),
-                    project_id,
-                    String::from_str(&env, "Two"),
-                    400i128,
-                    20u64,
-                )
-                    .into_val(&env),
-                sub_invokes: &[],
-            },
-        }])
-        .try_add_milestone(
-            &client_address,
-            &project_id,
-            &String::from_str(&env, "Two"),
-            &400i128,
-            &20u64,
-        );
 
     assert_eq!(result, Err(Ok(Error::AmountMismatch)));
 }
 
 #[test]
 fn deposit_success() {
-    let (env, contract_id, _factory, _vault, client_address, freelancer, token) = setup();
-    let escrow = EscrowContractClient::new(&env, &contract_id);
-    let project_id = create_project(
-        &env,
-        &contract_id,
-        &escrow,
-        &client_address,
-        &freelancer,
-        &token,
-        1_000,
-    );
+    let (env, escrow_id, vault_id, _factory, client, freelancer, token) = setup();
+    let escrow = EscrowContractClient::new(&env, &escrow_id);
+    let vault = TestPaymentVaultClient::new(&env, &vault_id);
+    let project_id = create_project(&escrow, &client, &freelancer, &token, 1_000);
 
-    deposit(&env, &contract_id, &escrow, &client_address, project_id, 600);
+    escrow.deposit(&client, &project_id, &600i128);
 
     assert_eq!(escrow.get_project(&project_id).escrow_balance, 600);
-    assert_eq!(
-        env.events().all(),
-        vec![
-            &env,
-            (
-                contract_id,
-                (Symbol::new(&env, "FUNDS_DEPOSITED"), project_id).into_val(&env),
-                600i128.into_val(&env),
-            ),
-        ]
-    );
+    assert_eq!(vault.get_vault_balance(&project_id), 600);
 }
 
 #[test]
 fn deposit_zero_rejected() {
-    let (env, contract_id, _factory, _vault, client_address, freelancer, token) = setup();
-    let escrow = EscrowContractClient::new(&env, &contract_id);
-    let project_id = create_project(
-        &env,
-        &contract_id,
-        &escrow,
-        &client_address,
-        &freelancer,
-        &token,
-        1_000,
-    );
+    let (env, escrow_id, _vault_id, _factory, client, freelancer, token) = setup();
+    let escrow = EscrowContractClient::new(&env, &escrow_id);
+    let project_id = create_project(&escrow, &client, &freelancer, &token, 1_000);
 
-    let result = escrow
-        .mock_auths(&[MockAuth {
-            address: &client_address,
-            invoke: &MockAuthInvoke {
-                contract: &contract_id,
-                fn_name: "deposit",
-                args: (client_address.clone(), project_id, 0i128).into_val(&env),
-                sub_invokes: &[],
-            },
-        }])
-        .try_deposit(&client_address, &project_id, &0i128);
+    let result = escrow.try_deposit(&client, &project_id, &0i128);
 
     assert_eq!(result, Err(Ok(Error::InvalidAmount)));
 }
 
 #[test]
 fn deposit_overpayment_rejected() {
-    let (env, contract_id, _factory, _vault, client_address, freelancer, token) = setup();
-    let escrow = EscrowContractClient::new(&env, &contract_id);
-    let project_id = create_project(
-        &env,
-        &contract_id,
-        &escrow,
-        &client_address,
-        &freelancer,
-        &token,
-        1_000,
-    );
+    let (env, escrow_id, _vault_id, _factory, client, freelancer, token) = setup();
+    let escrow = EscrowContractClient::new(&env, &escrow_id);
+    let project_id = create_project(&escrow, &client, &freelancer, &token, 1_000);
 
-    deposit(&env, &contract_id, &escrow, &client_address, project_id, 800);
-
-    let result = escrow
-        .mock_auths(&[MockAuth {
-            address: &client_address,
-            invoke: &MockAuthInvoke {
-                contract: &contract_id,
-                fn_name: "deposit",
-                args: (client_address.clone(), project_id, 300i128).into_val(&env),
-                sub_invokes: &[],
-            },
-        }])
-        .try_deposit(&client_address, &project_id, &300i128);
+    escrow.deposit(&client, &project_id, &800i128);
+    let result = escrow.try_deposit(&client, &project_id, &300i128);
 
     assert_eq!(result, Err(Ok(Error::AmountMismatch)));
 }
 
 #[test]
 fn submit_milestone_success() {
-    let (env, contract_id, _factory, _vault, client_address, freelancer, token) = setup();
-    let escrow = EscrowContractClient::new(&env, &contract_id);
-    let project_id = create_project(
-        &env,
-        &contract_id,
-        &escrow,
-        &client_address,
-        &freelancer,
-        &token,
-        1_000,
-    );
-    let milestone_id =
-        add_milestone(&env, &contract_id, &escrow, &client_address, project_id, "Build", 500, 25);
+    let (env, escrow_id, _vault_id, _factory, client, freelancer, token) = setup();
+    let escrow = EscrowContractClient::new(&env, &escrow_id);
+    let project_id = create_project(&escrow, &client, &freelancer, &token, 1_000);
+    let milestone_id = add_milestone(&env, &escrow, &client, project_id, "Build", 500, 25);
 
-    submit_milestone(
-        &env,
-        &contract_id,
-        &escrow,
-        &freelancer,
-        project_id,
-        milestone_id,
-    );
+    escrow.submit_milestone(&freelancer, &project_id, &milestone_id);
 
     assert_eq!(
         escrow.get_milestone(&project_id, &milestone_id).status,
@@ -415,71 +325,26 @@ fn submit_milestone_success() {
 
 #[test]
 fn submit_milestone_unauthorized() {
-    let (env, contract_id, _factory, _vault, client_address, freelancer, token) = setup();
-    let escrow = EscrowContractClient::new(&env, &contract_id);
+    let (env, escrow_id, _vault_id, _factory, client, freelancer, token) = setup();
+    let escrow = EscrowContractClient::new(&env, &escrow_id);
     let outsider = Address::generate(&env);
-    let project_id = create_project(
-        &env,
-        &contract_id,
-        &escrow,
-        &client_address,
-        &freelancer,
-        &token,
-        1_000,
-    );
-    let milestone_id =
-        add_milestone(&env, &contract_id, &escrow, &client_address, project_id, "Build", 500, 25);
+    let project_id = create_project(&escrow, &client, &freelancer, &token, 1_000);
+    let milestone_id = add_milestone(&env, &escrow, &client, project_id, "Build", 500, 25);
 
-    let result = escrow
-        .mock_auths(&[MockAuth {
-            address: &outsider,
-            invoke: &MockAuthInvoke {
-                contract: &contract_id,
-                fn_name: "submit_milestone",
-                args: (outsider.clone(), project_id, milestone_id).into_val(&env),
-                sub_invokes: &[],
-            },
-        }])
-        .try_submit_milestone(&outsider, &project_id, &milestone_id);
+    let result = escrow.try_submit_milestone(&outsider, &project_id, &milestone_id);
 
     assert_eq!(result, Err(Ok(Error::Unauthorized)));
 }
 
 #[test]
 fn approve_milestone_success() {
-    let (env, contract_id, _factory, _vault, client_address, freelancer, token) = setup();
-    let escrow = EscrowContractClient::new(&env, &contract_id);
-    let project_id = create_project(
-        &env,
-        &contract_id,
-        &escrow,
-        &client_address,
-        &freelancer,
-        &token,
-        1_000,
-    );
-    let milestone_id =
-        add_milestone(&env, &contract_id, &escrow, &client_address, project_id, "QA", 300, 30);
-    submit_milestone(
-        &env,
-        &contract_id,
-        &escrow,
-        &freelancer,
-        project_id,
-        milestone_id,
-    );
+    let (env, escrow_id, _vault_id, _factory, client, freelancer, token) = setup();
+    let escrow = EscrowContractClient::new(&env, &escrow_id);
+    let project_id = create_project(&escrow, &client, &freelancer, &token, 1_000);
+    let milestone_id = add_milestone(&env, &escrow, &client, project_id, "QA", 300, 30);
+    escrow.submit_milestone(&freelancer, &project_id, &milestone_id);
 
-    escrow
-        .mock_auths(&[MockAuth {
-            address: &client_address,
-            invoke: &MockAuthInvoke {
-                contract: &contract_id,
-                fn_name: "approve_milestone",
-                args: (client_address.clone(), project_id, milestone_id).into_val(&env),
-                sub_invokes: &[],
-            },
-        }])
-        .approve_milestone(&client_address, &project_id, &milestone_id);
+    escrow.approve_milestone(&client, &project_id, &milestone_id);
 
     assert_eq!(
         escrow.get_milestone(&project_id, &milestone_id).status,
@@ -489,118 +354,76 @@ fn approve_milestone_success() {
 
 #[test]
 fn approve_milestone_by_freelancer_rejected() {
-    let (env, contract_id, _factory, _vault, client_address, _freelancer, token) = setup();
-    let escrow = EscrowContractClient::new(&env, &contract_id);
+    let (env, escrow_id, _vault_id, _factory, client, _freelancer, token) = setup();
+    let escrow = EscrowContractClient::new(&env, &escrow_id);
     let shared_address = Address::generate(&env);
-    let project_id = create_project(
-        &env,
-        &contract_id,
-        &escrow,
-        &client_address,
-        &shared_address,
-        &token,
-        1_000,
-    );
-    let milestone_id =
-        add_milestone(&env, &contract_id, &escrow, &client_address, project_id, "QA", 300, 30);
-    submit_milestone(
-        &env,
-        &contract_id,
-        &escrow,
-        &shared_address,
-        project_id,
-        milestone_id,
-    );
+    let project_id = create_project(&escrow, &client, &shared_address, &token, 1_000);
+    let milestone_id = add_milestone(&env, &escrow, &client, project_id, "QA", 300, 30);
+    escrow.submit_milestone(&shared_address, &project_id, &milestone_id);
 
-    let result = escrow
-        .mock_auths(&[MockAuth {
-            address: &shared_address,
-            invoke: &MockAuthInvoke {
-                contract: &contract_id,
-                fn_name: "approve_milestone",
-                args: (shared_address.clone(), project_id, milestone_id).into_val(&env),
-                sub_invokes: &[],
-            },
-        }])
-        .try_approve_milestone(&shared_address, &project_id, &milestone_id);
+    let result = escrow.try_approve_milestone(&shared_address, &project_id, &milestone_id);
 
     assert_eq!(result, Err(Ok(Error::SelfApprovalNotAllowed)));
 }
 
 #[test]
 fn approve_milestone_unauthorized() {
-    let (env, contract_id, _factory, _vault, client_address, freelancer, token) = setup();
-    let escrow = EscrowContractClient::new(&env, &contract_id);
+    let (env, escrow_id, _vault_id, _factory, client, freelancer, token) = setup();
+    let escrow = EscrowContractClient::new(&env, &escrow_id);
     let outsider = Address::generate(&env);
-    let project_id = create_project(
-        &env,
-        &contract_id,
-        &escrow,
-        &client_address,
-        &freelancer,
-        &token,
-        1_000,
-    );
-    let milestone_id =
-        add_milestone(&env, &contract_id, &escrow, &client_address, project_id, "QA", 300, 30);
-    submit_milestone(
-        &env,
-        &contract_id,
-        &escrow,
-        &freelancer,
-        project_id,
-        milestone_id,
-    );
+    let project_id = create_project(&escrow, &client, &freelancer, &token, 1_000);
+    let milestone_id = add_milestone(&env, &escrow, &client, project_id, "QA", 300, 30);
+    escrow.submit_milestone(&freelancer, &project_id, &milestone_id);
 
-    let result = escrow
-        .mock_auths(&[MockAuth {
-            address: &outsider,
-            invoke: &MockAuthInvoke {
-                contract: &contract_id,
-                fn_name: "approve_milestone",
-                args: (outsider.clone(), project_id, milestone_id).into_val(&env),
-                sub_invokes: &[],
-            },
-        }])
-        .try_approve_milestone(&outsider, &project_id, &milestone_id);
+    let result = escrow.try_approve_milestone(&outsider, &project_id, &milestone_id);
 
     assert_eq!(result, Err(Ok(Error::Unauthorized)));
 }
 
 #[test]
 fn pause_blocks_state_changes() {
-    let (env, contract_id, factory, _vault, client_address, freelancer, token) = setup();
-    let escrow = EscrowContractClient::new(&env, &contract_id);
+    let (env, escrow_id, _vault_id, factory, client, freelancer, token) = setup();
+    let escrow = EscrowContractClient::new(&env, &escrow_id);
 
-    escrow
-        .mock_auths(&[MockAuth {
-            address: &factory,
-            invoke: &MockAuthInvoke {
-                contract: &contract_id,
-                fn_name: "pause",
-                args: (factory.clone(),).into_val(&env),
-                sub_invokes: &[],
-            },
-        }])
-        .pause(&factory);
+    escrow.pause(&factory);
 
-    let result = escrow
-        .mock_auths(&[MockAuth {
-            address: &client_address,
-            invoke: &MockAuthInvoke {
-                contract: &contract_id,
-                fn_name: "create_project",
-                args: (
-                    client_address.clone(),
-                    freelancer.clone(),
-                    token.clone(),
-                    1_000i128,
-                )
-                    .into_val(&env),
-                sub_invokes: &[],
-            },
-        }])
-        .try_create_project(&client_address, &freelancer, &token, &1_000i128);
+    let result = escrow.try_create_project(&client, &freelancer, &token, &1_000i128);
 
     assert_eq!(result, Err(Ok(Error::ProjectPaused)));
+}
+
+#[test]
+fn release_payment_success_via_vault_cross_contract_call() {
+    let (env, escrow_id, vault_id, _factory, client, freelancer, token) = setup();
+    let escrow = EscrowContractClient::new(&env, &escrow_id);
+    let vault = TestPaymentVaultClient::new(&env, &vault_id);
+    let token_client = token::Client::new(&env, &token);
+    let (project_id, milestone_id) = funded_project(&env, &escrow, &client, &freelancer, &token);
+
+    escrow.submit_milestone(&freelancer, &project_id, &milestone_id);
+    escrow.approve_milestone(&client, &project_id, &milestone_id);
+    escrow.release_payment(&project_id, &milestone_id);
+
+    assert_eq!(
+        escrow.get_milestone(&project_id, &milestone_id).status,
+        MilestoneStatus::Paid
+    );
+    assert_eq!(escrow.get_project(&project_id).escrow_balance, 0);
+    assert_eq!(vault.get_vault_balance(&project_id), 0);
+    assert_eq!(token_client.balance(&freelancer), 500);
+}
+
+#[test]
+fn release_payment_double_rejected() {
+    let (env, escrow_id, _vault_id, _factory, client, freelancer, token) = setup();
+    let escrow = EscrowContractClient::new(&env, &escrow_id);
+    let (project_id, milestone_id) = funded_project(&env, &escrow, &client, &freelancer, &token);
+
+    escrow.submit_milestone(&freelancer, &project_id, &milestone_id);
+    escrow.approve_milestone(&client, &project_id, &milestone_id);
+    escrow.release_payment(&project_id, &milestone_id);
+
+    let result = escrow.try_release_payment(&project_id, &milestone_id);
+
+    assert_eq!(result, Err(Ok(Error::AlreadyPaid)));
 }

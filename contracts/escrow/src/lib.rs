@@ -12,11 +12,44 @@ pub use errors::Error;
 pub use storage::DataKey;
 pub use types::{Milestone, MilestoneStatus, Project, ProjectStatus};
 
-use soroban_sdk::{contract, contractimpl, panic_with_error, Address, Env, String};
+use soroban_sdk::{
+    contract, contractclient, contractimpl, panic_with_error, Address, Env, String,
+};
 use types::Dispute;
 
 #[contract]
 pub struct EscrowContract;
+
+#[contractclient(name = "PaymentVaultClient")]
+pub trait PaymentVaultContract {
+    fn hold_funds(
+        env: Env,
+        from: Address,
+        token: Address,
+        amount: i128,
+        project_id: u32,
+        milestone_id: u32,
+    );
+
+    fn release_funds(
+        env: Env,
+        caller: Address,
+        token: Address,
+        to: Address,
+        amount: i128,
+        project_id: u32,
+        milestone_id: u32,
+    );
+
+    fn refund_funds(
+        env: Env,
+        caller: Address,
+        token: Address,
+        to: Address,
+        amount: i128,
+        project_id: u32,
+    );
+}
 
 #[contractimpl]
 impl EscrowContract {
@@ -133,6 +166,9 @@ impl EscrowContract {
             panic_with_error!(&env, Error::AmountMismatch);
         }
 
+        let vault_client = payment_vault_client(&env);
+        vault_client.hold_funds(&client, &project.token, &amount, &project_id, &0u32);
+
         project.escrow_balance = next_balance;
         write_project(&env, &project);
 
@@ -200,11 +236,19 @@ impl EscrowContract {
             panic_with_error!(&env, Error::InvalidState);
         }
 
+        let vault_client = payment_vault_client(&env);
+        vault_client.release_funds(
+            &env.current_contract_address(),
+            &project.token,
+            &project.freelancer,
+            &milestone.amount,
+            &project_id,
+            &milestone_id,
+        );
+
         milestone.status = MilestoneStatus::Paid;
         project.escrow_balance = checked_sub(&env, project.escrow_balance, milestone.amount);
         write_milestone(&env, project_id, &milestone);
-
-        // TODO(phase 4): real vault cross-contract call
 
         let paid_count = increment_paid_milestones(&env, project_id);
         if paid_count == project.milestone_count {
@@ -335,6 +379,17 @@ impl EscrowContract {
         }
 
         let refunded_amount = project.escrow_balance;
+        if refunded_amount > 0 {
+            let vault_client = payment_vault_client(&env);
+            vault_client.refund_funds(
+                &env.current_contract_address(),
+                &project.token,
+                &project.client,
+                &refunded_amount,
+                &project_id,
+            );
+        }
+
         project.escrow_balance = checked_sub(&env, project.escrow_balance, refunded_amount);
         write_project(&env, &project);
 
@@ -430,6 +485,15 @@ fn increment_counter(env: &Env, key: &DataKey) -> u32 {
         .unwrap_or_else(|| panic_with_error!(env, Error::InvalidState));
     env.storage().persistent().set(key, &next);
     next
+}
+
+fn payment_vault_client(env: &Env) -> PaymentVaultClient<'_> {
+    let vault_address: Address = env
+        .storage()
+        .persistent()
+        .get(&DataKey::Vault)
+        .unwrap_or_else(|| panic_with_error!(env, Error::Unauthorized));
+    PaymentVaultClient::new(env, &vault_address)
 }
 
 fn require_factory_admin(env: &Env, admin: &Address) {
