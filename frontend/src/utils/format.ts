@@ -10,6 +10,38 @@
 /** 1 XLM (or 1 unit of any Soroban token) = 10^7 stroops. */
 export const STROOPS_PER_UNIT = 10_000_000;
 
+/** User-typed XLM amounts: whole part + up to 7 decimal places. */
+const XLM_AMOUNT_RE = /^\d+(\.\d{1,7})?$/;
+
+/**
+ * True when `input` parses as a positive XLM amount (up to 7 decimals).
+ * Used by wizard validation before anything reaches a contract.
+ */
+export function isValidXlmAmount(input: string): boolean {
+  const trimmed = input.trim();
+  if (!XLM_AMOUNT_RE.test(trimmed)) {
+    return false;
+  }
+  // Reject "0", "0.0", "000", …
+  return Number(trimmed) > 0;
+}
+
+/**
+ * Converts a user-typed XLM amount (e.g. "1.5") to an exact stroop count.
+ * Invalid input degrades to `0n`. Uses whole + padded-fraction arithmetic
+ * (never `parseFloat * 1e7`) so sums like 0.1 + 0.2 are exact — the wizard
+ * relies on this when requiring milestones to sum to the project total.
+ */
+export function xlmToStroops(input: string): bigint {
+  const trimmed = input.trim();
+  if (!XLM_AMOUNT_RE.test(trimmed)) {
+    return 0n;
+  }
+  const [whole, fraction = ""] = trimmed.split(".");
+  const paddedFraction = (fraction + "0000000").slice(0, 7);
+  return BigInt(whole) * BigInt(STROOPS_PER_UNIT) + BigInt(paddedFraction);
+}
+
 /**
  * Strictly parses an i128 stroop string. Malformed input degrades to `0n`
  * instead of throwing, so a bad on-chain value never crashes a page — balances
