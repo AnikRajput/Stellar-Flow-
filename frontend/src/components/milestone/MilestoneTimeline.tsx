@@ -1,5 +1,5 @@
 /**
- * Milestone timeline (Phase 10).
+ * Milestone timeline (Phase 10 → Phase 11 wiring).
  *
  * Renders a project's milestones as a vertical flow:
  *
@@ -16,20 +16,25 @@
  *      client     → "Approve" / "Dispute" on `submitted` milestones
  *      anyone else → read-only
  *
- * Action buttons run a REAL build+simulation of the corresponding escrow
- * method (`submit_milestone` / `approve_milestone` / `open_dispute`) through
- * `useContract` and surface the contract's verdict verbatim — no signing, no
- * fake state changes. Signing + submission land in Phase 11.
+ * Action buttons now run the REAL transaction lifecycle (`useTransaction`):
+ * build → simulate → sign (Freighter) → submit → poll, calling the escrow
+ * contract's `submit_milestone` / `approve_milestone` / `open_dispute`. Each
+ * row shows a TxStatusPanel while its action is in flight and after it settles
+ * (confirmed → explorer link; failed → plain-language reason + Try Again). The
+ * local milestone status is never mutated optimistically — the timeline
+ * reflects on-chain state once reads land (Phase 12).
  */
 
 import { useState, type SVGProps } from "react";
-import { scValToNative, xdr } from "@stellar/stellar-sdk";
-import { CONTRACTS } from "@/config/contracts";
+import { nativeToScVal, xdr } from "@stellar/stellar-sdk";
 import { MILESTONE_TONE } from "@/components/project/ProjectCard";
+import { TxStatusPanel } from "@/components/transaction/TxStatusPanel";
 import { Badge } from "@/components/ui/Badge";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { useContract } from "@/hooks/useContract";
+import { useTransaction } from "@/hooks/useTransaction";
 import { useWallet } from "@/hooks/useWallet";
+import { getEscrowContract } from "@/services/contracts";
+import { buildTx, toScVal } from "@/services/transactions";
 import type { Milestone, MilestoneStatus } from "@/types/milestone";
 import type { Project } from "@/types/project";
 import { formatStroopsAsUnits, parseStroops } from "@/utils/format";
@@ -51,31 +56,30 @@ interface MilestoneTimelineProps {
   onOpenDetails?: (milestone: Milestone) => void;
 }
 
-interface SimulationOutcome {
-  ok: boolean;
-  title: string;
-  detail: string;
-}
-
-interface ActionFeedback {
-  running: boolean;
-  outcome: SimulationOutcome | null;
-}
-
 interface MilestoneAction {
   label: string;
   method: "submit_milestone" | "approve_milestone" | "open_dispute";
-  /** Builds the contract args for a connected wallet address. */
-  args: (address: string) => unknown[];
+  /** Builds the contract args (ScVals) for a connected wallet address. */
+  args: (address: string) => xdr.ScVal[];
   className: string;
 }
 
+/** Settled outcome of one row's action (kept per milestone id). */
+interface RowResult {
+  outcome: "confirmed" | "failed";
+  hash: string | null;
+  error: string | null;
+  /** The action that produced this result — reused by Try Again. */
+  action: MilestoneAction;
+}
+
 /**
- * Reason sent to `open_dispute` in simulation only — nothing persists on-chain
- * in this phase. A real reason input lands with the signing flow (Phase 11).
+ * Reason sent to `open_dispute`. This phase has no reason input yet (it lands
+ * with the signing flow in a later phase), so a clearly-marked placeholder is
+ * used — the dispute is real and on-chain; only the reason text is generic.
  */
 const DISPUTE_REASON_PLACEHOLDER =
-  "Dispute opened from the milestone timeline — reason input lands in Phase 11.";
+  "Dispute opened from the milestone timeline — reason input lands in a later phase.";
 
 const SUBMIT_BUTTON_CLASS =
   "inline-flex items-center gap-1.5 rounded-lg bg-navy-600 px-3 py-1.5 text-xs font-semibold text-white shadow-glow transition-colors hover:bg-navy-500 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none";
@@ -157,74 +161,6 @@ function roleLabel(role: ViewerRole): string {
   return "guest — read-only";
 }
 
-function toErrorMessage(err: unknown): string {
-  if (err instanceof Error) {
-    return err.message;
-  }
-  return String(err);
-}
-
-/**
- * Narrow the raw simulation response (returned as `unknown` by useContract)
- * into a human-readable outcome. Mirrors the documented rpc.Api response shape
- * used by the Phase 9 wizard: success carries `.result.retval`, failure `.error`.
- */
-function describeSimulation(result: unknown, method: string): SimulationOutcome {
-  if (result === null || typeof result !== "object") {
-    return {
-      ok: false,
-      title: "Unexpected response",
-      detail: "The RPC returned an unrecognized simulation result.",
-    };
-  }
-  const sim = result as {
-    error?: unknown;
-    result?: { result?: "success" | "error"; retval?: unknown };
-  };
-  if (sim.error) {
-    return {
-      ok: false,
-      title: "Contract rejected the call",
-      detail: `Simulation error: ${String(sim.error)}`,
-    };
-  }
-  if (sim.result) {
-    // A reverted (panicked) call surfaces INSIDE `result` as `result ===
-    // "error"`, not as a top-level `error` — treat it as a rejection, never
-    // as success (mirrors the fix applied to CreateProject's copy).
-    if (sim.result.result === "error") {
-      return {
-        ok: false,
-        title: "Contract rejected the call",
-        detail: `${method} reverted in simulation — the contract rejected it (e.g. InvalidState for this milestone's current status).`,
-      };
-    }
-    // Some methods (submit/approve) return Void; open_dispute returns the new
-    // dispute id (u32 → number). Decode when a retval is present.
-    let returned = "";
-    if (sim.result.retval) {
-      try {
-        const value = scValToNative(sim.result.retval as xdr.ScVal);
-        if (value !== null && value !== undefined) {
-          returned = ` (would return ${String(value)})`;
-        }
-      } catch {
-        // Retval present but not decodable — the simulation itself succeeded.
-      }
-    }
-    return {
-      ok: true,
-      title: "Validation succeeded",
-      detail: `The escrow contract accepted ${method} in simulation${returned}. Signing and submission land in Phase 11.`,
-    };
-  }
-  return {
-    ok: false,
-    title: "Inconclusive simulation",
-    detail: "The RPC returned neither a result nor an error.",
-  };
-}
-
 function formatDue(dueDate: number): string {
   return new Date(dueDate * 1000).toLocaleDateString(undefined, {
     month: "short",
@@ -243,7 +179,11 @@ function roleActions(
       {
         label: "Submit",
         method: "submit_milestone",
-        args: (address) => [address, projectId, milestone.id],
+        args: (address) => [
+          toScVal(address),
+          nativeToScVal(projectId, { type: "u32" }),
+          nativeToScVal(milestone.id, { type: "u32" }),
+        ],
         className: SUBMIT_BUTTON_CLASS,
       },
     ];
@@ -253,49 +193,27 @@ function roleActions(
       {
         label: "Approve",
         method: "approve_milestone",
-        args: (address) => [address, projectId, milestone.id],
+        args: (address) => [
+          toScVal(address),
+          nativeToScVal(projectId, { type: "u32" }),
+          nativeToScVal(milestone.id, { type: "u32" }),
+        ],
         className: APPROVE_BUTTON_CLASS,
       },
       {
         label: "Dispute",
         method: "open_dispute",
         args: (address) => [
-          address,
-          projectId,
-          milestone.id,
-          DISPUTE_REASON_PLACEHOLDER,
+          toScVal(address),
+          nativeToScVal(projectId, { type: "u32" }),
+          nativeToScVal(milestone.id, { type: "u32" }),
+          toScVal(DISPUTE_REASON_PLACEHOLDER),
         ],
         className: DISPUTE_BUTTON_CLASS,
       },
     ];
   }
   return [];
-}
-
-function SpinnerIcon() {
-  return (
-    <svg
-      className="h-3 w-3 animate-spin"
-      viewBox="0 0 24 24"
-      fill="none"
-      aria-hidden="true"
-    >
-      <circle
-        cx="12"
-        cy="12"
-        r="10"
-        stroke="currentColor"
-        strokeWidth="4"
-        className="opacity-25"
-      />
-      <path
-        d="M4 12a8 8 0 0 1 8-8"
-        stroke="currentColor"
-        strokeWidth="4"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
 }
 
 export function MilestoneTimeline({
@@ -307,8 +225,11 @@ export function MilestoneTimeline({
 }: MilestoneTimelineProps) {
   // All hooks run before any conditional return — React rules of hooks.
   const { address } = useWallet();
-  const { call } = useContract();
-  const [actions, setActions] = useState<Record<number, ActionFeedback>>({});
+  const tx = useTransaction();
+  /** Id of the milestone whose action is currently in flight (one at a time). */
+  const [activeId, setActiveId] = useState<number | null>(null);
+  const [activeLabel, setActiveLabel] = useState<string | null>(null);
+  const [results, setResults] = useState<Record<number, RowResult>>({});
 
   const role: ViewerRole =
     address === project.client
@@ -316,6 +237,8 @@ export function MilestoneTimeline({
       : address === project.freelancer
         ? "freelancer"
         : "neither";
+
+  const busy = activeId !== null;
 
   // Filled portion of the connector = paid value / total value (exact stroops).
   const paidStroops = milestones.reduce(
@@ -333,33 +256,28 @@ export function MilestoneTimeline({
     milestone: Milestone,
     action: MilestoneAction,
   ): Promise<void> {
-    if (!address) return;
-    setActions((prev) => ({
+    if (!address || busy) return;
+    setActiveId(milestone.id);
+    setActiveLabel(action.label);
+    const result = await tx.execute(() =>
+      buildTx({
+        contract: getEscrowContract(),
+        method: action.method,
+        args: action.args(address),
+        source: address,
+      }),
+    );
+    setResults((prev) => ({
       ...prev,
-      [milestone.id]: { running: true, outcome: null },
+      [milestone.id]: {
+        outcome: result.outcome,
+        hash: result.hash,
+        error: result.error,
+        action,
+      },
     }));
-    try {
-      const result = await call(CONTRACTS.escrow, action.method, action.args(address));
-      setActions((prev) => ({
-        ...prev,
-        [milestone.id]: {
-          running: false,
-          outcome: describeSimulation(result, action.method),
-        },
-      }));
-    } catch (err) {
-      setActions((prev) => ({
-        ...prev,
-        [milestone.id]: {
-          running: false,
-          outcome: {
-            ok: false,
-            title: "Couldn't validate on-chain",
-            detail: toErrorMessage(err),
-          },
-        },
-      }));
-    }
+    setActiveId(null);
+    setActiveLabel(null);
   }
 
   if (loading) {
@@ -419,9 +337,10 @@ export function MilestoneTimeline({
 
         {milestones.map((milestone) => {
           const state = nodeState(milestone.status);
-          const feedback = actions[milestone.id];
-          const busy = feedback?.running ?? false;
           const rowActions = roleActions(role, milestone, project.id);
+          const rowResult = results[milestone.id];
+          const isActive = activeId === milestone.id;
+          const alreadyConfirmed = rowResult?.outcome === "confirmed";
 
           return (
             <li key={milestone.id} className="relative flex gap-4 pb-8 last:pb-0">
@@ -451,7 +370,7 @@ export function MilestoneTimeline({
                   {formatDue(milestone.dueDate)}
                 </p>
 
-                {rowActions.length > 0 && (
+                {rowActions.length > 0 && !alreadyConfirmed && (
                   <div className="mt-3 flex flex-wrap gap-2">
                     {rowActions.map((action) => (
                       <button
@@ -461,27 +380,39 @@ export function MilestoneTimeline({
                         onClick={() => void runAction(milestone, action)}
                         className={action.className}
                       >
-                        {busy && <SpinnerIcon />}
                         {action.label}
                       </button>
                     ))}
                   </div>
                 )}
 
-                {feedback?.outcome && (
-                  <p
-                    role="status"
-                    className={`mt-3 rounded-lg border p-3 text-xs leading-relaxed ${
-                      feedback.outcome.ok
-                        ? "border-emerald-500/30 bg-emerald-500/5 text-emerald-200"
-                        : "border-red-500/30 bg-red-500/5 text-red-200"
-                    }`}
-                  >
-                    <span className="font-semibold">
-                      {feedback.outcome.ok ? "✓" : "✕"} {feedback.outcome.title}.
-                    </span>{" "}
-                    {feedback.outcome.detail}
-                  </p>
+                {/* Live panel while this row's action is in flight. */}
+                {isActive && (
+                  <div className="mt-3">
+                    <TxStatusPanel
+                      state={tx.state}
+                      hash={tx.hash}
+                      error={tx.error}
+                      label={activeLabel ?? undefined}
+                    />
+                  </div>
+                )}
+
+                {/* Settled panel once the action finishes. */}
+                {!isActive && rowResult && (
+                  <div className="mt-3">
+                    <TxStatusPanel
+                      state={rowResult.outcome === "confirmed" ? "confirmed" : "failed"}
+                      hash={rowResult.hash}
+                      error={rowResult.error}
+                      label={rowResult.action.label}
+                      onRetry={
+                        rowResult.outcome === "failed"
+                          ? () => void runAction(milestone, rowResult.action)
+                          : undefined
+                      }
+                    />
+                  </div>
                 )}
               </div>
             </li>

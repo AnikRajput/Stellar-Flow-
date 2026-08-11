@@ -1,18 +1,20 @@
 /**
- * Create Project wizard (Phase 9).
+ * Create Project wizard (Phase 9 → Phase 11 wiring).
  *
  * Four steps: Basics → Parties → Milestones → Review. Next/Submit are disabled
  * until the current step validates; milestones must sum to the project total
  * EXACTLY (the escrow contract itself rejects sums that exceed total_amount).
  *
- * Submit runs a real build+simulation of `escrow.create_project` through
- * `useContract` — no signing, no fake success. The simulation response is
- * surfaced verbatim (accepted → would create project #N; contract error → shown
- * as-is). `add_milestone` calls happen after real creation in Phase 11.
+ * "Create Project" now runs the REAL transaction lifecycle (`useTransaction`):
+ * build → simulate → sign (Freighter) → submit → poll, first for
+ * `create_project`, then one `add_milestone` per milestone row (sequentially).
+ * The TxStatusPanel shows each stage live, the tx hash becomes linkable the
+ * moment each transaction is submitted, and failures surface in plain language
+ * with a Try Again that re-runs only the failed step.
  */
 
-import { useCallback, useState } from "react";
-import { scValToNative, xdr } from "@stellar/stellar-sdk";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { nativeToScVal } from "@stellar/stellar-sdk";
 import { StepBasics } from "@/components/project/create/StepBasics";
 import { StepMilestones } from "@/components/project/create/StepMilestones";
 import { StepParties } from "@/components/project/create/StepParties";
@@ -26,11 +28,14 @@ import {
   type MilestoneDraft,
   type ProjectDraft,
 } from "@/components/project/create/wizard";
+import { TxStatusPanel } from "@/components/transaction/TxStatusPanel";
 import { WalletGuard } from "@/components/wallet/WalletGuard";
 import { WalletButton } from "@/components/wallet/WalletButton";
 import { CONTRACTS } from "@/config/contracts";
-import { useContract } from "@/hooks/useContract";
+import { useTransaction } from "@/hooks/useTransaction";
 import { useWallet } from "@/hooks/useWallet";
+import { getEscrowContract } from "@/services/contracts";
+import { buildTx, toScVal } from "@/services/transactions";
 import {
   STROOPS_PER_UNIT,
   formatUnits,
@@ -39,95 +44,35 @@ import {
 
 const STEPS = ["Basics", "Parties", "Milestones", "Review"] as const;
 
-interface SimulationOutcome {
-  ok: boolean;
-  title: string;
-  detail: string;
-}
+/** Flow state of the on-chain creation sequence. */
+type CreateFlow = "idle" | "running" | "done" | "failed";
 
-function toErrorMessage(err: unknown): string {
-  if (err instanceof Error) {
-    return err.message;
-  }
-  return String(err);
-}
-
-/**
- * Narrow the raw simulation response (returned as `unknown` by useContract)
- * into a human-readable outcome. Uses the documented rpc.Api response shape:
- * success carries `.result.retval`, failure carries `.error`.
- */
-function describeSimulation(result: unknown): SimulationOutcome {
-  if (result === null || typeof result !== "object") {
-    return {
-      ok: false,
-      title: "Unexpected response",
-      detail: "The RPC returned an unrecognized simulation result.",
-    };
-  }
-  const sim = result as {
-    error?: unknown;
-    result?: { result?: "success" | "error"; retval?: unknown };
-  };
-  if (sim.error) {
-    return {
-      ok: false,
-      title: "Contract rejected the project",
-      detail: `Simulation error: ${String(sim.error)}`,
-    };
-  }
-  if (sim.result) {
-    // A reverted (panicked) call surfaces INSIDE `result` as `result ===
-    // "error"`, not as a top-level `error` — never report it as success.
-    // (Mirrors the shared shape in MilestoneTimeline's describeSimulation.)
-    if (sim.result.result === "error") {
-      return {
-        ok: false,
-        title: "Contract rejected the project",
-        detail: "create_project reverted in simulation — the contract rejected it.",
-      };
-    }
-    const retval = sim.result.retval;
-    if (retval) {
-      try {
-        // create_project returns the new project id (u32 → number).
-        const projectId = scValToNative(retval as xdr.ScVal);
-        if (projectId !== null && projectId !== undefined) {
-          return {
-            ok: true,
-            title: "Validation succeeded",
-            detail: `The escrow contract accepted the project and would create it with id #${String(projectId)}. Signing and submission land in Phase 11.`,
-          };
-        }
-      } catch {
-        // retval present but not decodable — the simulation itself succeeded.
-      }
-    }
-    return {
-      ok: true,
-      title: "Validation succeeded",
-      detail:
-        "The escrow contract accepted the transaction in simulation. Signing and submission land in Phase 11.",
-    };
-  }
-  return {
-    ok: false,
-    title: "Inconclusive simulation",
-    detail: "The RPC returned neither a result nor an error.",
-  };
+/** "YYYY-MM-DD" (input[type=date]) → unix seconds for the u64 due_date. */
+function dueDateToEpochSeconds(dateStr: string): number {
+  const ms = Date.parse(`${dateStr}T00:00:00Z`);
+  return Number.isNaN(ms) ? 0 : Math.floor(ms / 1000);
 }
 
 export function CreateProject() {
   const wallet = useWallet();
-  const { call } = useContract();
   const clientAddress = wallet.address;
+  const tx = useTransaction();
 
   const [stepIndex, setStepIndex] = useState(0);
   const [draft, setDraft] = useState<ProjectDraft>(() =>
     createInitialDraft(CONTRACTS.token),
   );
   const [submitting, setSubmitting] = useState(false);
-  const [outcome, setOutcome] = useState<SimulationOutcome | null>(null);
+  // Mirrors `submitting` for callbacks that would otherwise capture a stale
+  // value (resetFlow must not hide the live panel while a run is in flight).
+  const submittingRef = useRef(false);
+  const [flow, setFlow] = useState<CreateFlow>("idle");
+  /** Index into `createSteps` of the step currently running / that failed. */
+  const [flowStep, setFlowStep] = useState(0);
+  /** Decoded `create_project` retval (project id). */
+  const [createdProjectId, setCreatedProjectId] = useState<number | null>(null);
+  /** Non-transaction flow failures (e.g. contract returned no project id). */
+  const [flowError, setFlowError] = useState<string | null>(null);
 
   const basicsOk = isBasicsValid(draft.name);
   const parties = validateParties(draft.freelancer, clientAddress);
@@ -137,12 +82,37 @@ export function CreateProject() {
   const canProceed = [basicsOk, parties.ok, milestones.ok][stepIndex] ?? true;
   const isLastStep = stepIndex === STEPS.length - 1;
 
-  // Any draft change invalidates a previous simulation outcome — clear it in
-  // every mutation handler so the success/error panel always matches the form.
-  const patchDraft = useCallback((patch: Partial<ProjectDraft>) => {
-    setDraft((current) => ({ ...current, ...patch }));
-    setOutcome(null);
+  /** Labels for each on-chain step of the sequence (create + milestones). */
+  const createSteps = useMemo(() => {
+    const steps: Array<{ label: string }> = [{ label: "Create project" }];
+    for (const milestone of draft.milestones) {
+      steps.push({
+        label: `Add milestone: ${milestone.name.trim() || "Untitled"}`,
+      });
+    }
+    return steps;
+  }, [draft.milestones]);
+
+  // Any draft change invalidates a previous on-chain run — reset the flow so
+  // stale success/failure panels never show a form they no longer describe.
+  const resetFlow = useCallback(() => {
+    // Never hide the live panel (or reset progress) while a run is submitting.
+    if (submittingRef.current) {
+      return;
+    }
+    setFlow("idle");
+    setFlowStep(0);
+    setCreatedProjectId(null);
+    setFlowError(null);
   }, []);
+
+  const patchDraft = useCallback(
+    (patch: Partial<ProjectDraft>) => {
+      setDraft((current) => ({ ...current, ...patch }));
+      resetFlow();
+    },
+    [resetFlow],
+  );
 
   const updateMilestone = useCallback(
     (id: string, patch: Partial<Omit<MilestoneDraft, "id">>) => {
@@ -152,9 +122,9 @@ export function CreateProject() {
           milestone.id === id ? { ...milestone, ...patch } : milestone,
         ),
       }));
-      setOutcome(null);
+      resetFlow();
     },
-    [],
+    [resetFlow],
   );
 
   const addMilestone = useCallback(() => {
@@ -162,16 +132,19 @@ export function CreateProject() {
       ...current,
       milestones: [...current.milestones, createEmptyMilestone()],
     }));
-    setOutcome(null);
-  }, []);
+    resetFlow();
+  }, [resetFlow]);
 
-  const removeMilestone = useCallback((id: string) => {
-    setDraft((current) => ({
-      ...current,
-      milestones: current.milestones.filter((milestone) => milestone.id !== id),
-    }));
-    setOutcome(null);
-  }, []);
+  const removeMilestone = useCallback(
+    (id: string) => {
+      setDraft((current) => ({
+        ...current,
+        milestones: current.milestones.filter((milestone) => milestone.id !== id),
+      }));
+      resetFlow();
+    },
+    [resetFlow],
+  );
 
   const goBack = useCallback(() => {
     setStepIndex((index) => Math.max(index - 1, 0));
@@ -181,31 +154,95 @@ export function CreateProject() {
     setStepIndex((index) => Math.min(index + 1, STEPS.length - 1));
   }, []);
 
-  async function handleSubmit(): Promise<void> {
+  /**
+   * Runs the on-chain sequence from a step index.
+   *
+   *  - `start === 0`: create_project, then every milestone's add_milestone
+   *  - `start >= 1` (Try Again after a milestone step failed): re-runs only
+   *    that milestone's add_milestone onward (never re-creates the project)
+   *
+   * Each transaction goes through the full lifecycle inside `useTransaction`.
+   */
+  async function runFlowFrom(start: number): Promise<void> {
     if (!allValid || !clientAddress || submitting) {
       return;
     }
     setSubmitting(true);
-    setOutcome(null);
+    submittingRef.current = true;
+    setFlow("running");
+    setFlowError(null);
+
     try {
-      // escrow.create_project(client, freelancer, token, total_amount: i128)
-      // Real signing + submission (and the follow-up add_milestone calls for
-      // each milestone row) land in Phase 11.
-      const result = await call(CONTRACTS.escrow, "create_project", [
-        clientAddress,
-        draft.freelancer.trim(),
-        draft.token,
-        xlmToStroops(draft.totalAmount),
-      ]);
-      setOutcome(describeSimulation(result));
-    } catch (err) {
-      setOutcome({
-        ok: false,
-        title: "Couldn't validate on-chain",
-        detail: toErrorMessage(err),
-      });
+      let projectId = createdProjectId;
+
+      if (start === 0) {
+        setFlowStep(0);
+        setCreatedProjectId(null);
+        projectId = null;
+
+        // escrow.create_project(client, freelancer, token, total_amount: i128)
+        const created = await tx.execute(() =>
+          buildTx({
+            contract: getEscrowContract(),
+            method: "create_project",
+            args: [
+              toScVal(clientAddress),
+              toScVal(draft.freelancer.trim()),
+              toScVal(draft.token),
+              toScVal(xlmToStroops(draft.totalAmount)),
+            ],
+            source: clientAddress,
+          }),
+        );
+        if (created.outcome !== "confirmed") {
+          setFlow("failed");
+          return;
+        }
+        projectId = typeof created.result === "number" ? created.result : null;
+        setCreatedProjectId(projectId);
+      }
+
+      if (projectId === null) {
+        // Create landed but no id came back (or a retry from a later step with
+        // no recorded id) — nothing safe to retry automatically.
+        setFlowError(
+          "The project exists on-chain, but we couldn't read its id. Check the explorer link and add milestones from the project page once reads land.",
+        );
+        setFlow("failed");
+        return;
+      }
+
+      // escrow.add_milestone(client, project_id: u32, name, amount: i128, due_date: u64)
+      const firstMilestone = Math.max(start - 1, 0);
+      for (let i = firstMilestone; i < draft.milestones.length; i++) {
+        setFlowStep(i + 1);
+        const milestone = draft.milestones[i];
+        const added = await tx.execute(() =>
+          buildTx({
+            contract: getEscrowContract(),
+            method: "add_milestone",
+            args: [
+              toScVal(clientAddress),
+              nativeToScVal(projectId, { type: "u32" }),
+              toScVal(milestone.name.trim()),
+              toScVal(xlmToStroops(milestone.amount)),
+              nativeToScVal(dueDateToEpochSeconds(milestone.dueDate), {
+                type: "u64",
+              }),
+            ],
+            source: clientAddress,
+          }),
+        );
+        if (added.outcome !== "confirmed") {
+          setFlow("failed");
+          return;
+        }
+      }
+
+      setFlow("done");
     } finally {
       setSubmitting(false);
+      submittingRef.current = false;
     }
   }
 
@@ -264,28 +301,6 @@ export function CreateProject() {
           )}
         </div>
 
-        {outcome && (
-          <div
-            role="status"
-            className={`mt-6 rounded-2xl border p-5 ${
-              outcome.ok
-                ? "border-emerald-500/30 bg-emerald-500/5"
-                : "border-red-500/30 bg-red-500/5"
-            }`}
-          >
-            <p
-              className={`text-sm font-semibold ${
-                outcome.ok ? "text-emerald-200" : "text-red-200"
-              }`}
-            >
-              {outcome.ok ? "✓" : "✕"} {outcome.title}
-            </p>
-            <p className="mt-1 text-xs leading-relaxed text-ink-300">
-              {outcome.detail}
-            </p>
-          </div>
-        )}
-
         {stepIndex === 3 && !milestones.ok && (
           <p className="mt-6 text-sm text-amber-300">
             {milestones.totalOk && milestones.mismatchStroops !== 0n ? (
@@ -305,11 +320,62 @@ export function CreateProject() {
           </p>
         )}
 
+        {flow !== "idle" && (
+          <div className="mt-6 space-y-3">
+            {flow === "running" && (
+              <p className="text-xs text-ink-400">
+                Step {Math.min(flowStep + 1, createSteps.length)} of{" "}
+                {createSteps.length} — {createSteps[flowStep]?.label}
+              </p>
+            )}
+            <TxStatusPanel
+              state={tx.state}
+              hash={tx.hash}
+              error={tx.error}
+              onRetry={
+                flow === "failed" && !flowError
+                  ? () => void runFlowFrom(flowStep)
+                  : undefined
+              }
+            />
+            {flow === "failed" && tx.hash && (
+              <p className="text-xs leading-relaxed text-ink-400">
+                If the previous attempt actually landed on-chain, retrying may
+                create a duplicate — check the explorer link above first.
+              </p>
+            )}
+            {flow === "failed" && flowError && (
+              <p
+                role="alert"
+                className="rounded-xl border border-red-500/30 bg-red-500/5 p-3 text-xs leading-relaxed text-red-200"
+              >
+                {flowError}
+              </p>
+            )}
+            {flow === "done" && createdProjectId !== null && (
+              <div
+                role="status"
+                className="rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-5"
+              >
+                <p className="text-sm font-semibold text-emerald-200">
+                  Project created on-chain
+                </p>
+                <p className="mt-1 text-xs leading-relaxed text-ink-300">
+                  Project #{createdProjectId} with {draft.milestones.length}{" "}
+                  milestone
+                  {draft.milestones.length === 1 ? "" : "s"} — confirmation
+                  above. Funding the escrow is the next step.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
         <nav className="mt-6 flex items-center justify-between gap-3">
           <button
             type="button"
             onClick={goBack}
-            disabled={stepIndex === 0}
+            disabled={stepIndex === 0 || submitting}
             className="rounded-lg border border-ink-700 bg-ink-800 px-4 py-2 text-sm font-medium text-ink-200 transition-colors hover:bg-ink-700 disabled:cursor-not-allowed disabled:opacity-40"
           >
             Back
@@ -318,18 +384,18 @@ export function CreateProject() {
           {isLastStep ? (
             <button
               type="button"
-              onClick={() => void handleSubmit()}
+              onClick={() => void runFlowFrom(0)}
               disabled={!allValid || submitting}
               className="inline-flex items-center gap-2 rounded-lg bg-navy-600 px-5 py-2 text-sm font-semibold text-white shadow-glow transition-all hover:bg-navy-500 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none"
             >
               {submitting && <SpinnerIcon />}
-              {submitting ? "Validating…" : "Create Project"}
+              {submitting ? "Creating…" : "Create Project"}
             </button>
           ) : (
             <button
               type="button"
               onClick={goNext}
-              disabled={!canProceed}
+              disabled={!canProceed || submitting}
               className="rounded-lg bg-navy-600 px-5 py-2 text-sm font-semibold text-white shadow-glow transition-all hover:bg-navy-500 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none"
             >
               Next
