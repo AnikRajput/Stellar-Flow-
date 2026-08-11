@@ -33,8 +33,11 @@ interface ProjectCardProps {
   milestones?: Milestone[];
 }
 
-/** Project status → semantic badge tone. */
-const STATUS_TONE: Record<ProjectStatus, BadgeTone> = {
+/**
+ * Project status → semantic badge tone.
+ * Exported for ProjectDetails + milestone components to reuse the same set.
+ */
+export const STATUS_TONE: Record<ProjectStatus, BadgeTone> = {
   active: "green",
   completed: "green",
   disputed: "red",
@@ -42,8 +45,11 @@ const STATUS_TONE: Record<ProjectStatus, BadgeTone> = {
   paused: "amber",
 };
 
-/** Milestone status → semantic badge tone. */
-const MILESTONE_TONE: Record<MilestoneStatus, BadgeTone> = {
+/**
+ * Milestone status → semantic badge tone.
+ * Exported for milestone components to reuse the same set.
+ */
+export const MILESTONE_TONE: Record<MilestoneStatus, BadgeTone> = {
   pending: "gray",
   submitted: "amber",
   approved: "green",
@@ -62,7 +68,8 @@ const AVATAR_CLASSES = [
   "bg-ink-700 text-ink-200",
 ];
 
-function avatarClass(address: string): string {
+/** Exported for ProjectDetails + milestone components to reuse the same avatar. */
+export function avatarClass(address: string): string {
   let hash = 0;
   for (let i = 0; i < address.length; i++) {
     hash = (hash * 31 + address.charCodeAt(i)) >>> 0;

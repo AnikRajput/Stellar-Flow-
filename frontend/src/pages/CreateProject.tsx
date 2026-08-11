@@ -67,7 +67,7 @@ function describeSimulation(result: unknown): SimulationOutcome {
   }
   const sim = result as {
     error?: unknown;
-    result?: { retval?: unknown };
+    result?: { result?: "success" | "error"; retval?: unknown };
   };
   if (sim.error) {
     return {
@@ -77,6 +77,16 @@ function describeSimulation(result: unknown): SimulationOutcome {
     };
   }
   if (sim.result) {
+    // A reverted (panicked) call surfaces INSIDE `result` as `result ===
+    // "error"`, not as a top-level `error` — never report it as success.
+    // (Mirrors the shared shape in MilestoneTimeline's describeSimulation.)
+    if (sim.result.result === "error") {
+      return {
+        ok: false,
+        title: "Contract rejected the project",
+        detail: "create_project reverted in simulation — the contract rejected it.",
+      };
+    }
     const retval = sim.result.retval;
     if (retval) {
       try {
