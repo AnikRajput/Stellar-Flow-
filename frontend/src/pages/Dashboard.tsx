@@ -16,7 +16,7 @@
 
 import { useMemo } from "react";
 import { ActivityFeedRow } from "@/components/activity/ActivityFeedRow";
-import { SidebarNav } from "@/components/layout/SidebarNav";
+import { SidebarNav, type NavItemId } from "@/components/layout/SidebarNav";
 import {
   ProjectCard,
   ProjectCardSkeleton,
@@ -35,9 +35,20 @@ type Role = "client" | "freelancer";
 interface DashboardProps {
   /** Which side of the escrow the dashboard summarizes. Defaults to "client". */
   role?: Role;
+  /** App-shell nav wiring — forwarded to the page's SidebarNav. */
+  onNavigate?: (id: NavItemId) => void;
+  /** Opens a project's details (app shell → ProjectDetails). */
+  onOpenProject?: (projectId: number) => void;
+  /** Opens the Create Project wizard (app shell → CreateProject). */
+  onCreateProject?: () => void;
 }
 
-export function Dashboard({ role = "client" }: DashboardProps) {
+export function Dashboard({
+  role = "client",
+  onNavigate,
+  onOpenProject,
+  onCreateProject,
+}: DashboardProps) {
   // Used by WalletButton; useProjects() also creates an instance internally.
   // Independent instances are fine — Freighter reads are idempotent and there
   // is no shared mutable state (a context could consolidate this in a later
@@ -75,7 +86,7 @@ export function Dashboard({ role = "client" }: DashboardProps) {
 
   return (
     <div className="flex min-h-screen">
-      <SidebarNav active="dashboard" />
+      <SidebarNav active="dashboard" onNavigate={onNavigate} />
 
       <main className="min-w-0 flex-1 px-6 py-8 md:px-10">
         <header className="flex flex-wrap items-center justify-between gap-4">
@@ -87,7 +98,19 @@ export function Dashboard({ role = "client" }: DashboardProps) {
               Escrow and milestone overview for your projects.
             </p>
           </div>
-          <WalletButton wallet={wallet} />
+          <div className="flex flex-wrap items-center gap-3">
+            {onCreateProject && (
+              <button
+                type="button"
+                onClick={onCreateProject}
+                className="inline-flex items-center gap-2 rounded-lg bg-navy-600 px-4 py-2 text-sm font-semibold text-white shadow-glow transition-all hover:bg-navy-500"
+              >
+                <PlusIcon className="h-4 w-4" />
+                New project
+              </button>
+            )}
+            <WalletButton wallet={wallet} />
+          </div>
         </header>
 
         <section
@@ -160,7 +183,14 @@ export function Dashboard({ role = "client" }: DashboardProps) {
           ) : (
             <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
               {projects.map((project) => (
-                <ProjectCard key={project.id} project={project} role={role} />
+                <ProjectCard
+                  key={project.id}
+                  project={project}
+                  role={role}
+                  onSelect={
+                    onOpenProject ? () => onOpenProject(project.id) : undefined
+                  }
+                />
               ))}
             </div>
           )}
@@ -244,6 +274,15 @@ function ProjectsIcon() {
       <rect x="14" y="3" width="7" height="5" rx="1.5" />
       <rect x="14" y="12" width="7" height="9" rx="1.5" />
       <rect x="3" y="16" width="7" height="5" rx="1.5" />
+    </svg>
+  );
+}
+
+function PlusIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 5v14" />
+      <path d="M5 12h14" />
     </svg>
   );
 }

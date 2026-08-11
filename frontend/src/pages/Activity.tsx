@@ -14,7 +14,7 @@
  */
 
 import { useMemo, useState } from "react";
-import { SidebarNav } from "@/components/layout/SidebarNav";
+import { SidebarNav, type NavItemId } from "@/components/layout/SidebarNav";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { WalletButton } from "@/components/wallet/WalletButton";
 import { CONTRACTS } from "@/config/contracts";
@@ -44,7 +44,12 @@ const ALL_EVENT_TYPES: readonly ContractEventName[] = [
 
 type TypeFilter = "all" | ContractEventName;
 
-export function Activity() {
+interface ActivityProps {
+  /** App-shell nav wiring — forwarded to the page's SidebarNav. */
+  onNavigate?: (id: NavItemId) => void;
+}
+
+export function Activity({ onNavigate }: ActivityProps) {
   const wallet = useWallet();
   const { events, loading } = useContractEvents(CONTRACTS.escrow);
 
@@ -72,7 +77,7 @@ export function Activity() {
 
   return (
     <div className="flex min-h-screen">
-      <SidebarNav active="activity" />
+      <SidebarNav active="activity" onNavigate={onNavigate} />
 
       <main className="min-w-0 flex-1 px-6 py-8 md:px-10">
         <header className="flex flex-wrap items-center justify-between gap-4">

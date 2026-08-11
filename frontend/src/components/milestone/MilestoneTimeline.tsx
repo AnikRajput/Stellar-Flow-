@@ -27,6 +27,7 @@
 
 import { useState, type SVGProps } from "react";
 import { nativeToScVal, xdr } from "@stellar/stellar-sdk";
+import { OpenDisputeModal } from "@/components/dispute/OpenDisputeModal";
 import { MILESTONE_TONE } from "@/components/project/ProjectCard";
 import { TxStatusPanel } from "@/components/transaction/TxStatusPanel";
 import { Badge } from "@/components/ui/Badge";
@@ -58,9 +59,12 @@ interface MilestoneTimelineProps {
 
 interface MilestoneAction {
   label: string;
-  method: "submit_milestone" | "approve_milestone" | "open_dispute";
+  /** Contract method for direct actions (absent for modal-driven actions). */
+  method?: "submit_milestone" | "approve_milestone";
+  /** When true, opens the OpenDisputeModal instead of calling a method. */
+  opensModal?: boolean;
   /** Builds the contract args (ScVals) for a connected wallet address. */
-  args: (address: string) => xdr.ScVal[];
+  args?: (address: string) => xdr.ScVal[];
   className: string;
 }
 
@@ -72,14 +76,6 @@ interface RowResult {
   /** The action that produced this result — reused by Try Again. */
   action: MilestoneAction;
 }
-
-/**
- * Reason sent to `open_dispute`. This phase has no reason input yet (it lands
- * with the signing flow in a later phase), so a clearly-marked placeholder is
- * used — the dispute is real and on-chain; only the reason text is generic.
- */
-const DISPUTE_REASON_PLACEHOLDER =
-  "Dispute opened from the milestone timeline — reason input lands in a later phase.";
 
 const SUBMIT_BUTTON_CLASS =
   "inline-flex items-center gap-1.5 rounded-lg bg-navy-600 px-3 py-1.5 text-xs font-semibold text-white shadow-glow transition-colors hover:bg-navy-500 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none";
@@ -202,13 +198,9 @@ function roleActions(
       },
       {
         label: "Dispute",
-        method: "open_dispute",
-        args: (address) => [
-          toScVal(address),
-          nativeToScVal(projectId, { type: "u32" }),
-          nativeToScVal(milestone.id, { type: "u32" }),
-          toScVal(DISPUTE_REASON_PLACEHOLDER),
-        ],
+        // Opens the OpenDisputeModal (real reason input → open_dispute) instead
+        // of sending a placeholder reason directly.
+        opensModal: true,
         className: DISPUTE_BUTTON_CLASS,
       },
     ];
@@ -230,6 +222,10 @@ export function MilestoneTimeline({
   const [activeId, setActiveId] = useState<number | null>(null);
   const [activeLabel, setActiveLabel] = useState<string | null>(null);
   const [results, setResults] = useState<Record<number, RowResult>>({});
+  /** Milestone the client flagged for dispute — drives the OpenDisputeModal. */
+  const [disputeMilestone, setDisputeMilestone] = useState<Milestone | null>(
+    null,
+  );
 
   const role: ViewerRole =
     address === project.client
@@ -257,13 +253,18 @@ export function MilestoneTimeline({
     action: MilestoneAction,
   ): Promise<void> {
     if (!address || busy) return;
+    if (action.opensModal) {
+      setDisputeMilestone(milestone);
+      return;
+    }
     setActiveId(milestone.id);
     setActiveLabel(action.label);
     const result = await tx.execute(() =>
       buildTx({
         contract: getEscrowContract(),
-        method: action.method,
-        args: action.args(address),
+        // Non-modal actions always carry method + args (see runAction guard).
+        method: action.method!,
+        args: action.args!(address),
         source: address,
       }),
     );
@@ -312,9 +313,10 @@ export function MilestoneTimeline({
   }
 
   return (
-    <div>
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold text-ink-100">Milestone flow</h3>
+    <>
+      <div>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-sm font-semibold text-ink-100">Milestone flow</h3>
         <p className="text-xs text-ink-400">Viewing as {roleLabel(role)}</p>
       </div>
       <p className="mt-1 text-xs tabular-nums text-ink-400">
@@ -418,8 +420,18 @@ export function MilestoneTimeline({
             </li>
           );
         })}
-      </ol>
-    </div>
+        </ol>
+      </div>
+
+      {disputeMilestone && (
+        <OpenDisputeModal
+          project={project}
+          milestone={disputeMilestone}
+          onClose={() => setDisputeMilestone(null)}
+          onOpened={() => setDisputeMilestone(null)}
+        />
+      )}
+    </>
   );
 }
 

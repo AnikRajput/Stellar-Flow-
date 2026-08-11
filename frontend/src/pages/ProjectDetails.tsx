@@ -19,7 +19,7 @@
  */
 
 import { useCallback, useState } from "react";
-import { SidebarNav } from "@/components/layout/SidebarNav";
+import { SidebarNav, type NavItemId } from "@/components/layout/SidebarNav";
 import { MilestoneDetailsModal } from "@/components/milestone/MilestoneDetailsModal";
 import { MilestoneTimeline } from "@/components/milestone/MilestoneTimeline";
 import { avatarClass, STATUS_TONE } from "@/components/project/ProjectCard";
@@ -49,11 +49,16 @@ const TAB_LABELS: Record<TabId, string> = {
 };
 
 interface ProjectDetailsProps {
-  /** Project id (u32). Router wiring lands with the app shell. */
+  /** Project id (u32). */
   projectId: number;
+  /** App-shell nav wiring — forwarded to the page's SidebarNav. */
+  onNavigate?: (id: NavItemId) => void;
 }
 
-export function ProjectDetails({ projectId }: ProjectDetailsProps) {
+export function ProjectDetails({
+  projectId,
+  onNavigate,
+}: ProjectDetailsProps) {
   const wallet = useWallet();
   const { project, loading, error } = useProject(projectId);
   // Milestones only matter once the project (and its count) is known.
@@ -73,7 +78,7 @@ export function ProjectDetails({ projectId }: ProjectDetailsProps) {
 
   return (
     <div className="flex min-h-screen">
-      <SidebarNav active="projects" />
+      <SidebarNav active="projects" onNavigate={onNavigate} />
 
       <main className="min-w-0 flex-1 px-6 py-8 md:px-10">
         <header className="flex flex-wrap items-center justify-between gap-4">

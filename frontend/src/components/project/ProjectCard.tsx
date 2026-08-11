@@ -31,6 +31,11 @@ interface ProjectCardProps {
    * derived from escrow funding and no milestone-level details are claimed.
    */
   milestones?: Milestone[];
+  /**
+   * When provided, the card becomes a keyboard-accessible button that calls
+   * this handler (app shell navigates to the project's details).
+   */
+  onSelect?: () => void;
 }
 
 /**
@@ -173,6 +178,7 @@ export function ProjectCard({
   project,
   role,
   milestones = [],
+  onSelect,
 }: ProjectCardProps) {
   const counterpartAddress =
     role === "client" ? project.freelancer : project.client;
@@ -183,7 +189,25 @@ export function ProjectCard({
     upcoming !== null && upcoming.dueDate * 1000 < Date.now();
 
   return (
-    <article className="flex flex-col gap-4 rounded-2xl border border-ink-800 bg-ink-900/60 p-5 transition-all hover:-translate-y-0.5 hover:border-ink-700 hover:shadow-glow">
+    <article
+      onClick={onSelect}
+      onKeyDown={
+        onSelect
+          ? (event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                onSelect();
+              }
+            }
+          : undefined
+      }
+      role={onSelect ? "button" : undefined}
+      tabIndex={onSelect ? 0 : undefined}
+      aria-label={onSelect ? `Open project #${project.id} details` : undefined}
+      className={`flex flex-col gap-4 rounded-2xl border border-ink-800 bg-ink-900/60 p-5 transition-all hover:-translate-y-0.5 hover:border-ink-700 hover:shadow-glow ${
+        onSelect ? "cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-navy-400" : ""
+      }`}
+    >
       <header className="flex items-start justify-between gap-3">
         <h3 className="text-sm font-semibold text-ink-50">
           Project #{project.id}
