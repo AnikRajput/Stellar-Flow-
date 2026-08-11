@@ -74,3 +74,33 @@ export function shortenAddress(address: string): string {
   }
   return `${address.slice(0, 4)}…${address.slice(-3)}`;
 }
+
+/** "just now" / "5m ago" / "3h ago" / "2d ago" for a unix-seconds timestamp. */
+export function relativeTime(epochSeconds: number): string {
+  // 0 means "no timestamp" in event decoding — never render "20533d ago".
+  if (epochSeconds <= 0) {
+    return "—";
+  }
+  const seconds = Math.max(0, Math.floor(Date.now() / 1000) - epochSeconds);
+  if (seconds < 60) {
+    return "just now";
+  }
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) {
+    return `${minutes}m ago`;
+  }
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) {
+    return `${hours}h ago`;
+  }
+  return `${Math.floor(hours / 24)}d ago`;
+}
+
+/**
+ * Stellar Expert explorer URL for a transaction hash.
+ * Testnet per the Phase 10/11/12 prompts; generalizing to the configured
+ * network is deferred until explorer-network mapping lands.
+ */
+export function explorerTxUrl(txHash: string): string {
+  return `https://stellar.expert/explorer/testnet/tx/${txHash}`;
+}

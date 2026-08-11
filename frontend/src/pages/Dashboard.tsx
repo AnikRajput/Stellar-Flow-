@@ -1,8 +1,9 @@
 /**
  * Dashboard (Phase 8).
  *
- * Assembles: SidebarNav + 4 StatCards + a role-filtered ProjectCard grid + an
- * activity panel placeholder (live feed lands in Phase 12).
+ * Assembles: SidebarNav + 4 StatCards + a role-filtered ProjectCard grid +
+ * a LIVE activity panel (real escrow events via `useContractEvents` — new
+ * on-chain events append without a page reload).
  *
  * Data honesty rules:
  *  - While `useProjects().loading` → Skeleton stat values + skeleton cards.
@@ -14,6 +15,7 @@
  */
 
 import { useMemo } from "react";
+import { ActivityFeedRow } from "@/components/activity/ActivityFeedRow";
 import { SidebarNav } from "@/components/layout/SidebarNav";
 import {
   ProjectCard,
@@ -22,6 +24,8 @@ import {
 import { Skeleton } from "@/components/ui/Skeleton";
 import { StatCard } from "@/components/ui/StatCard";
 import { WalletButton } from "@/components/wallet/WalletButton";
+import { CONTRACTS } from "@/config/contracts";
+import { useContractEvents } from "@/hooks/useContractEvents";
 import { useProjects } from "@/hooks/useProjects";
 import { useWallet } from "@/hooks/useWallet";
 import { formatStroopsAsUnits, parseStroops } from "@/utils/format";
@@ -40,6 +44,12 @@ export function Dashboard({ role = "client" }: DashboardProps) {
   // phase).
   const wallet = useWallet();
   const { projects, loading, error, refetch } = useProjects(role);
+  // Live escrow events — independent of the stubbed project reads, so the
+  // activity panel shows REAL on-chain activity while the grid below is still
+  // in its error state this phase.
+  const { events: activityEvents, loading: activityLoading } = useContractEvents(
+    CONTRACTS.escrow,
+  );
 
   const activeCount = useMemo(
     () => projects.filter((p) => p.status === "active").length,
@@ -157,15 +167,39 @@ export function Dashboard({ role = "client" }: DashboardProps) {
         </section>
 
         <section className="mt-10" aria-label="Activity">
-          <h2 className="text-lg font-semibold text-ink-50">Activity</h2>
-          <div className="mt-4 rounded-2xl border border-ink-800 bg-ink-900/60 p-8 text-center">
-            <ActivityIcon className="mx-auto h-6 w-6 text-ink-500" />
-            <p className="mt-3 text-sm font-medium text-ink-200">
-              Live activity feed
-            </p>
-            <p className="mt-1 text-xs text-ink-400">
-              On-chain events stream here — wired up in Phase 12.
-            </p>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-lg font-semibold text-ink-50">Activity</h2>
+            <span className="text-xs text-ink-400">
+              Live — polls the RPC every ~5s
+            </span>
+          </div>
+          <div className="mt-4 space-y-2">
+            {activityLoading ? (
+              <div className="rounded-2xl border border-ink-800 bg-ink-900/60 p-4">
+                <Skeleton className="h-12 w-full rounded-lg" />
+                <Skeleton className="mt-2 h-12 w-full rounded-lg" />
+                <Skeleton className="mt-2 h-12 w-full rounded-lg" />
+              </div>
+            ) : activityEvents.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-ink-700 p-8 text-center">
+                <ActivityIcon className="mx-auto h-6 w-6 text-ink-500" />
+                <p className="mt-3 text-sm font-medium text-ink-200">
+                  No activity yet
+                </p>
+                <p className="mt-1 text-xs text-ink-400">
+                  Events emitted by the escrow contract appear here as they
+                  land on-chain.
+                </p>
+              </div>
+            ) : (
+              activityEvents.slice(0, 8).map((event, index) => (
+                <ActivityFeedRow
+                  key={`${event.ledger}:${event.txHash}:${event.topic}:${index}`}
+                  event={event}
+                  compact
+                />
+              ))
+            )}
           </div>
         </section>
       </main>
