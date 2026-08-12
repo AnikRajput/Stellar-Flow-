@@ -1,0 +1,61 @@
+# StellarFlow — Contract deployment to Testnet (Phase 16).
+#
+# Runs only on an EXPLICIT trigger:
+#   - manual:        Repository → Actions → "Deploy contracts to Testnet" →
+#                    "Run workflow"
+#   - tag push:      any `v*` tag (e.g. `git tag v0.1.0 && git push --tags`)
+#
+# It runs the Phase 17 deploy scripts (`scripts/build-contracts.sh` then
+# `scripts/deploy-testnet.sh`) and uploads the resulting `.wasm` files and the
+# deployed contract IDs as build artifacts.
+#
+# Deliberately NO frontend deploy step here: the frontend is never deployed as
+# a side effect of this workflow — it gets its own explicit trigger.
+
+name: Deploy contracts to Testnet
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+jobs:
+  deploy:
+    name: Build and deploy contracts
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust (stable + wasm32 target)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      # Phase 17 lands scripts/build-contracts.sh + scripts/deploy-testnet.sh.
+      - name: Build contract .wasm artifacts
+        run: |
+          chmod +x scripts/build-contracts.sh scripts/deploy-testnet.sh
+          ./scripts/build-contracts.sh
+
+      - name: Deploy to Testnet
+        run: ./scripts/deploy-testnet.sh
+        # deploy-testnet.sh will need the funded Testnet account / network
+        # config it defines. Wire any secrets it requires here once Phase 17
+        # lands, e.g.:
+        # env:
+        #   TESTNET_SECRET: ${{ secrets.TESTNET_SECRET }}
+
+      - name: Upload contract artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: contract-artifacts
+          # Paths match the standard soroban output dir + the IDs file the
+          # deploy script writes. Adjust the IDs glob if Phase 17 names the
+          # file differently; `warn` (not error) keeps this step honest if a
+          # given run produces no match.
+          if-no-files-found: warn
+          path: |
+            contracts/*/target/wasm32-unknown-unknown/release/*.wasm
+            **/contract-ids.*

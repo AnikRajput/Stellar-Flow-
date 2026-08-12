@@ -66,7 +66,10 @@ export function ResolveDisputeControls({
 
   async function resolve(releaseToFreelancer: boolean): Promise<void> {
     if (!address || busy) return;
-    const result = await tx.execute(() =>
+    // Drive the full lifecycle (build → simulate → sign → submit → poll); the
+    // outcome is surfaced through `tx.state`/`tx.hash`/`tx.error` below, so the
+    // return value is intentionally unused.
+    await tx.execute(() =>
       buildTx({
         contract: getEscrowContract(),
         method: "resolve_dispute",

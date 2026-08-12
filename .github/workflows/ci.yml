@@ -1,0 +1,66 @@
+# StellarFlow — CI (Phase 16).
+#
+# Two independent jobs, both required for the workflow to pass:
+#
+#   contracts — fmt / clippy / tests / wasm32 release build for all workspace
+#               members (contracts/{project-factory,escrow,payment-vault}).
+#   frontend  — install (workspace npm ci at the repo root — the lockfile is
+#               root-level), lint, test, build.
+#
+# Every step fails the job on any non-zero exit (no `continue-on-error`).
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  contracts:
+    name: Contracts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust (stable + wasm32 target)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Check formatting
+        run: cargo fmt --check
+
+      - name: Clippy (warnings are errors)
+        run: cargo clippy -- -D warnings
+
+      - name: Test (all workspace members)
+        run: cargo test --workspace
+
+      - name: Build contracts (wasm32 release)
+        run: cargo build --target wasm32-unknown-unknown --release
+
+  frontend:
+    name: Frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm run test
+
+      - name: Build
+        run: npm run build
