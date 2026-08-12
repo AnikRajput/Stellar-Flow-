@@ -78,7 +78,7 @@ export function App() {
       // The wizard has no sidebar of its own — frame it like the other pages so
       // the user can always navigate away.
       return (
-        <div className="flex min-h-screen">
+        <div className="flex min-h-screen flex-col md:flex-row">
           <SidebarNav active="projects" onNavigate={navigate} />
           <main className="min-w-0 flex-1">
             <CreateProject />
@@ -108,10 +108,10 @@ function ProjectsView({
   const { projects, loading, error, refetch } = useProjects(role);
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen flex-col md:flex-row">
       <SidebarNav active="projects" onNavigate={onNavigate} />
 
-      <main className="min-w-0 flex-1 px-6 py-8 md:px-10">
+      <main className="min-w-0 flex-1 px-6 pt-8 pb-24 md:px-10 md:py-8">
         <header className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight text-ink-50">
@@ -125,7 +125,7 @@ function ProjectsView({
             <button
               type="button"
               onClick={onCreateProject}
-              className="inline-flex items-center gap-2 rounded-lg bg-navy-600 px-4 py-2 text-sm font-semibold text-white shadow-glow transition-all hover:bg-navy-500"
+              className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-navy-600 px-4 py-2 text-sm font-semibold text-white shadow-glow transition-all hover:bg-navy-500 md:min-h-0"
             >
               <PlusIcon className="h-4 w-4" />
               New project
@@ -220,10 +220,10 @@ function SettingsView({
   ] as const;
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen flex-col md:flex-row">
       <SidebarNav active="settings" onNavigate={onNavigate} />
 
-      <main className="min-w-0 flex-1 px-6 py-8 md:px-10">
+      <main className="min-w-0 flex-1 px-6 pt-8 pb-24 md:px-10 md:py-8">
         <header className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight text-ink-50">

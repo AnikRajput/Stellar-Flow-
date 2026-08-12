@@ -157,10 +157,10 @@ export function Disputes({ onNavigate }: DisputesProps) {
   }, [records, address, isArbitrator, details.projects]);
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen flex-col md:flex-row">
       <SidebarNav active="disputes" onNavigate={onNavigate} />
 
-      <main className="min-w-0 flex-1 px-6 py-8 md:px-10">
+      <main className="min-w-0 flex-1 px-6 pt-8 pb-24 md:px-10 md:py-8">
         <header className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight text-ink-50">
@@ -176,7 +176,7 @@ export function Disputes({ onNavigate }: DisputesProps) {
         <WalletGuard>
           <section className="mt-6">
             {loading ? (
-              <div className="grid gap-4 xl:grid-cols-2">
+              <div className="grid gap-4 md:grid-cols-2">
                 {[0, 1, 2].map((index) => (
                   <DisputeCardSkeleton key={index} />
                 ))}
@@ -185,7 +185,7 @@ export function Disputes({ onNavigate }: DisputesProps) {
               <EmptyState isArbitrator={isArbitrator} />
             ) : (
               <>
-                <div className="grid gap-4 xl:grid-cols-2">
+                <div className="grid gap-4 md:grid-cols-2">
                   {visible.map((record) => (
                     <DisputeCard
                       key={milestoneKey(record.projectId, record.milestoneId)}

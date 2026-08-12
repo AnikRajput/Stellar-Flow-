@@ -77,12 +77,17 @@ interface RowResult {
   action: MilestoneAction;
 }
 
+// Phase 15: `min-h-11 md:min-h-0` keeps the ≥44px mobile/tablet tap target
+// while restoring the compact desktop height; `flex-1 md:flex-none` stretches
+// the actions full-width on phones (two actions split the row evenly).
+const MOBILE_TARGET =
+  "min-h-11 md:min-h-0 flex-1 md:flex-none";
 const SUBMIT_BUTTON_CLASS =
-  "inline-flex items-center gap-1.5 rounded-lg bg-navy-600 px-3 py-1.5 text-xs font-semibold text-white shadow-glow transition-colors hover:bg-navy-500 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none";
+  `inline-flex items-center justify-center gap-1.5 rounded-lg bg-navy-600 px-3 py-1.5 text-xs font-semibold text-white shadow-glow transition-colors hover:bg-navy-500 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none ${MOBILE_TARGET}`;
 const APPROVE_BUTTON_CLASS =
-  "inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-200 transition-colors hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-40";
+  `inline-flex items-center justify-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-200 transition-colors hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-40 ${MOBILE_TARGET}`;
 const DISPUTE_BUTTON_CLASS =
-  "inline-flex items-center gap-1.5 rounded-lg border border-red-500/30 bg-red-500/5 px-3 py-1.5 text-xs font-semibold text-red-200 transition-colors hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-40";
+  `inline-flex items-center justify-center gap-1.5 rounded-lg border border-red-500/30 bg-red-500/5 px-3 py-1.5 text-xs font-semibold text-red-200 transition-colors hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-40 ${MOBILE_TARGET}`;
 
 /** Node state derived from the on-chain milestone status. */
 function nodeState(status: MilestoneStatus): NodeState {
@@ -326,10 +331,11 @@ export function MilestoneTimeline({
       </p>
 
       <ol className="relative mt-6">
-        {/* Connector: track + filled portion proportional to paid/total value. */}
+        {/* Connector: track + filled portion proportional to paid/total value.
+            Offset tracks the node diameter — 20px on mobile, 24px at sm+. */}
         <div
           aria-hidden="true"
-          className="absolute bottom-6 left-[11px] top-6 w-0.5 -translate-x-1/2 rounded-full bg-ink-800"
+          className="absolute bottom-5 left-[9px] top-5 w-0.5 -translate-x-1/2 rounded-full bg-ink-800 sm:bottom-6 sm:left-[11px] sm:top-6"
         >
           <div
             className="absolute inset-x-0 top-0 rounded-full bg-emerald-500/80 transition-all duration-500"
@@ -345,15 +351,18 @@ export function MilestoneTimeline({
           const alreadyConfirmed = rowResult?.outcome === "confirmed";
 
           return (
-            <li key={milestone.id} className="relative flex gap-4 pb-8 last:pb-0">
+            <li
+              key={milestone.id}
+              className="relative flex gap-3 pb-6 last:pb-0 sm:gap-4 sm:pb-8"
+            >
               <span
                 aria-hidden="true"
-                className={`relative z-10 mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border bg-ink-900 ${NODE_DOT_CLASSES[state]}`}
+                className={`relative z-10 mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border bg-ink-900 sm:h-6 sm:w-6 ${NODE_DOT_CLASSES[state]}`}
               >
                 <NodeIcon state={state} />
               </span>
 
-              <div className="min-w-0 flex-1 rounded-xl border border-ink-800 bg-ink-900/60 p-4 transition-colors hover:border-ink-700">
+              <div className="min-w-0 flex-1 rounded-xl border border-ink-800 bg-ink-900/60 p-3 transition-colors hover:border-ink-700 sm:p-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <button
                     type="button"
@@ -441,12 +450,15 @@ function TimelineSkeleton() {
     <div className="relative mt-6">
       <div
         aria-hidden="true"
-        className="absolute bottom-6 left-[11px] top-6 w-0.5 -translate-x-1/2 bg-ink-800"
+        className="absolute bottom-5 left-[9px] top-5 w-0.5 -translate-x-1/2 bg-ink-800 sm:bottom-6 sm:left-[11px] sm:top-6"
       />
       {[0, 1, 2].map((index) => (
-        <div key={index} className="relative flex gap-4 pb-8 last:pb-0">
-          <span className="relative z-10 mt-0.5 h-6 w-6 shrink-0 rounded-full border border-ink-800 bg-ink-900" />
-          <div className="min-w-0 flex-1 rounded-xl border border-ink-800 bg-ink-900/60 p-4">
+        <div
+          key={index}
+          className="relative flex gap-3 pb-6 last:pb-0 sm:gap-4 sm:pb-8"
+        >
+          <span className="relative z-10 mt-0.5 h-5 w-5 shrink-0 rounded-full border border-ink-800 bg-ink-900 sm:h-6 sm:w-6" />
+          <div className="min-w-0 flex-1 rounded-xl border border-ink-800 bg-ink-900/60 p-3 sm:p-4">
             <Skeleton className="h-4 w-40 rounded-md" />
             <Skeleton className="mt-2 h-3 w-28 rounded-md" />
           </div>

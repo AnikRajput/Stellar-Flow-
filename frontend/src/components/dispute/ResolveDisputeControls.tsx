@@ -34,10 +34,13 @@ interface ResolveDisputeControlsProps {
   dispute: DisputeRecord;
 }
 
+// Phase 15: `min-h-11 sm:min-h-0` keeps wallet/action buttons ≥44px on phones
+// while restoring the original desktop height; `flex-1 sm:flex-none` stretches
+// them full-width on mobile.
 const RELEASE_BUTTON_CLASS =
-  "inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-200 transition-colors hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-40";
+  "inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-200 transition-colors hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-40 md:min-h-0 md:flex-none";
 const REFUND_BUTTON_CLASS =
-  "inline-flex items-center gap-1.5 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs font-semibold text-amber-200 transition-colors hover:bg-amber-500/20 disabled:cursor-not-allowed disabled:opacity-40";
+  "inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs font-semibold text-amber-200 transition-colors hover:bg-amber-500/20 disabled:cursor-not-allowed disabled:opacity-40 md:min-h-0 md:flex-none";
 
 export function ResolveDisputeControls({
   dispute,

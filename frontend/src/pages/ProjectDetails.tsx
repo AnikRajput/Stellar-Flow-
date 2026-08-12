@@ -77,10 +77,10 @@ export function ProjectDetails({
   const closeMilestone = useCallback(() => setSelectedMilestone(null), []);
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen flex-col md:flex-row">
       <SidebarNav active="projects" onNavigate={onNavigate} />
 
-      <main className="min-w-0 flex-1 px-6 py-8 md:px-10">
+      <main className="min-w-0 flex-1 px-6 pt-8 pb-24 md:px-10 md:py-8">
         <header className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight text-ink-50">
@@ -159,11 +159,13 @@ function HeaderStrip({ project }: { project: Project }) {
   const percent = escrowPercent(project);
   return (
     <section className="mt-6 rounded-2xl border border-ink-800 bg-ink-900/60 p-6">
-      <div className="flex flex-wrap items-center gap-5">
+      {/* Phase 15: column on mobile (Client → line → Freelancer stacked full-
+          width), the desktop row at sm+. */}
+      <div className="flex flex-col gap-5 sm:flex-row sm:flex-wrap sm:items-center sm:gap-5">
         <PartyAvatar role="Client" address={project.client} />
 
         {/* Connecting line — filled portion = escrow funded / total value. */}
-        <div className="min-w-32 flex-1 px-1 sm:px-4">
+        <div className="w-full px-0 sm:min-w-32 sm:flex-1 sm:px-4">
           <div className="h-1.5 w-full overflow-hidden rounded-full bg-ink-800">
             <div
               className="h-full rounded-full bg-navy-500 transition-all duration-500"
@@ -237,7 +239,7 @@ function Tabs({
             aria-selected={isActive}
             aria-controls={`panel-${tab}`}
             onClick={() => onChange(tab)}
-            className={`-mb-px whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-medium transition-colors ${
+            className={`-mb-px min-h-11 whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-medium transition-colors sm:min-h-0 ${
               isActive
                 ? "border-navy-500 text-ink-50"
                 : "border-transparent text-ink-400 hover:text-ink-200"
@@ -423,7 +425,7 @@ function ProjectErrorState({
 function HeaderStripSkeleton() {
   return (
     <section className="mt-6 rounded-2xl border border-ink-800 bg-ink-900/60 p-6">
-      <div className="flex flex-wrap items-center gap-5">
+      <div className="flex flex-col gap-5 sm:flex-row sm:flex-wrap sm:items-center sm:gap-5">
         <div className="flex items-center gap-3">
           <Skeleton className="h-11 w-11 rounded-full" />
           <div className="space-y-2">
@@ -431,7 +433,7 @@ function HeaderStripSkeleton() {
             <Skeleton className="h-4 w-28 rounded-md" />
           </div>
         </div>
-        <div className="min-w-32 flex-1 px-1 sm:px-4">
+        <div className="w-full px-0 sm:min-w-32 sm:flex-1 sm:px-4">
           <Skeleton className="h-1.5 w-full rounded-full" />
           <Skeleton className="mx-auto mt-2 h-3 w-44 rounded-md" />
         </div>

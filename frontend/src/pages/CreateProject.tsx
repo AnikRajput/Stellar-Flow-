@@ -248,7 +248,8 @@ export function CreateProject() {
 
   return (
     <WalletGuard>
-      <div className="mx-auto w-full max-w-3xl px-6 py-10">
+      {/* pb-24 clears the fixed mobile bottom nav (Phase 15). */}
+      <div className="mx-auto w-full max-w-3xl px-6 pt-10 pb-24 md:py-10">
         <header className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight text-ink-50">
@@ -376,7 +377,7 @@ export function CreateProject() {
             type="button"
             onClick={goBack}
             disabled={stepIndex === 0 || submitting}
-            className="rounded-lg border border-ink-700 bg-ink-800 px-4 py-2 text-sm font-medium text-ink-200 transition-colors hover:bg-ink-700 disabled:cursor-not-allowed disabled:opacity-40"
+            className="min-h-11 rounded-lg border border-ink-700 bg-ink-800 px-4 py-2 text-sm font-medium text-ink-200 transition-colors hover:bg-ink-700 disabled:cursor-not-allowed disabled:opacity-40 md:min-h-0"
           >
             Back
           </button>
@@ -386,7 +387,7 @@ export function CreateProject() {
               type="button"
               onClick={() => void runFlowFrom(0)}
               disabled={!allValid || submitting}
-              className="inline-flex items-center gap-2 rounded-lg bg-navy-600 px-5 py-2 text-sm font-semibold text-white shadow-glow transition-all hover:bg-navy-500 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none"
+              className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-navy-600 px-5 py-2 text-sm font-semibold text-white shadow-glow transition-all hover:bg-navy-500 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none md:min-h-0"
             >
               {submitting && <SpinnerIcon />}
               {submitting ? "Creating…" : "Create Project"}
@@ -396,7 +397,7 @@ export function CreateProject() {
               type="button"
               onClick={goNext}
               disabled={!canProceed || submitting}
-              className="rounded-lg bg-navy-600 px-5 py-2 text-sm font-semibold text-white shadow-glow transition-all hover:bg-navy-500 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none"
+              className="min-h-11 rounded-lg bg-navy-600 px-5 py-2 text-sm font-semibold text-white shadow-glow transition-all hover:bg-navy-500 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none md:min-h-0"
             >
               Next
             </button>

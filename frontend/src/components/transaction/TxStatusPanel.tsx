@@ -89,7 +89,7 @@ export function TxStatusPanel({
             <button
               type="button"
               onClick={onRetry}
-              className="mt-3 inline-flex items-center gap-2 rounded-lg border border-ink-700 bg-ink-800 px-3.5 py-1.5 text-xs font-semibold text-ink-100 transition-colors hover:bg-ink-700 hover:text-ink-50"
+              className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-lg border border-ink-700 bg-ink-800 px-3.5 py-1.5 text-xs font-semibold text-ink-100 transition-colors hover:bg-ink-700 hover:text-ink-50 md:min-h-0"
             >
               <RetryIcon className="h-3.5 w-3.5" />
               Try Again

@@ -85,10 +85,10 @@ export function Dashboard({
   );
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen flex-col md:flex-row">
       <SidebarNav active="dashboard" onNavigate={onNavigate} />
 
-      <main className="min-w-0 flex-1 px-6 py-8 md:px-10">
+      <main className="min-w-0 flex-1 px-6 pt-8 pb-24 md:px-10 md:py-8">
         <header className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight text-ink-50">
@@ -103,7 +103,7 @@ export function Dashboard({
               <button
                 type="button"
                 onClick={onCreateProject}
-                className="inline-flex items-center gap-2 rounded-lg bg-navy-600 px-4 py-2 text-sm font-semibold text-white shadow-glow transition-all hover:bg-navy-500"
+                className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-navy-600 px-4 py-2 text-sm font-semibold text-white shadow-glow transition-all hover:bg-navy-500 md:min-h-0"
               >
                 <PlusIcon className="h-4 w-4" />
                 New project

@@ -44,6 +44,26 @@ const ALL_EVENT_TYPES: readonly ContractEventName[] = [
 
 type TypeFilter = "all" | ContractEventName;
 
+/** Table column order — also the labels for the mobile card rows. */
+const COLUMN_LABELS = [
+  "Event",
+  "Project",
+  "Amount",
+  "Wallet",
+  "Tx hash",
+  "Time",
+  "Status",
+] as const;
+
+/**
+ * Phase 15: below `md` the table's cells become stacked card rows. Each cell
+ * shows its column label (from `data-label`, rendered by the ::before pseudo)
+ * followed by the value; at `md+` the label pseudo is hidden and the cells
+ * return to real table cells.
+ */
+const MOBILE_TD_CLASS =
+  "block px-4 py-1.5 md:table-cell md:px-4 md:py-3 before:mr-2 before:text-[11px] before:font-medium before:uppercase before:tracking-wider before:text-ink-500 before:content-[attr(data-label)] md:before:hidden";
+
 interface ActivityProps {
   /** App-shell nav wiring — forwarded to the page's SidebarNav. */
   onNavigate?: (id: NavItemId) => void;
@@ -76,10 +96,10 @@ export function Activity({ onNavigate }: ActivityProps) {
   }, [events, typeFilter, query]);
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen flex-col md:flex-row">
       <SidebarNav active="activity" onNavigate={onNavigate} />
 
-      <main className="min-w-0 flex-1 px-6 py-8 md:px-10">
+      <main className="min-w-0 flex-1 px-6 pt-8 pb-24 md:px-10 md:py-8">
         <header className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight text-ink-50">
@@ -101,7 +121,7 @@ export function Activity({ onNavigate }: ActivityProps) {
               onChange={(event) =>
                 setTypeFilter(event.target.value as TypeFilter)
               }
-              className="rounded-lg border border-ink-700 bg-ink-900 px-3 py-2 text-sm text-ink-100 outline-none transition-colors focus:border-navy-500"
+              className="min-h-11 rounded-lg border border-ink-700 bg-ink-900 px-3 py-2 text-sm text-ink-100 outline-none transition-colors focus:border-navy-500 sm:min-h-0"
             >
               <option value="all">All events</option>
               {ALL_EVENT_TYPES.map((topic) => (
@@ -118,7 +138,7 @@ export function Activity({ onNavigate }: ActivityProps) {
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Search project, wallet, tx hash…"
             aria-label="Search events"
-            className="w-full max-w-xs rounded-lg border border-ink-700 bg-ink-900 px-3 py-2 text-sm text-ink-100 placeholder:text-ink-500 outline-none transition-colors focus:border-navy-500"
+            className="w-full min-h-11 max-w-xs rounded-lg border border-ink-700 bg-ink-900 px-3 py-2 text-sm text-ink-100 placeholder:text-ink-500 outline-none transition-colors focus:border-navy-500 sm:min-h-0"
           />
 
           <p className="ml-auto text-xs text-ink-400">
@@ -126,10 +146,10 @@ export function Activity({ onNavigate }: ActivityProps) {
           </p>
         </div>
 
-        {/* Table */}
+        {/* Table — card rows on mobile, a real table at md+. */}
         <div className="mt-4 overflow-x-auto rounded-2xl border border-ink-800 bg-ink-900/60">
-          <table className="w-full min-w-[720px] border-collapse text-sm">
-            <thead>
+          <table className="w-full border-collapse text-sm md:min-w-[720px]">
+            <thead className="hidden md:table-header-group">
               <tr className="border-b border-ink-800 text-left text-xs uppercase tracking-wide text-ink-400">
                 <th className="px-4 py-3 font-medium">Event</th>
                 <th className="px-4 py-3 font-medium">Project</th>
@@ -140,20 +160,30 @@ export function Activity({ onNavigate }: ActivityProps) {
                 <th className="px-4 py-3 font-medium">Status</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="block md:table-row-group">
               {loading ? (
                 Array.from({ length: 5 }, (_, index) => (
-                  <tr key={index} className="border-b border-ink-800/60 last:border-0">
-                    {Array.from({ length: 7 }, (_, cell) => (
-                      <td key={cell} className="px-4 py-3">
+                  <tr
+                    key={index}
+                    className="block border-b border-ink-800/60 last:border-0 md:table-row"
+                  >
+                    {COLUMN_LABELS.map((label, cell) => (
+                      <td
+                        key={cell}
+                        data-label={label}
+                        className={MOBILE_TD_CLASS}
+                      >
                         <Skeleton className="h-4 w-full rounded-md" />
                       </td>
                     ))}
                   </tr>
                 ))
               ) : filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="px-4 py-10 text-center">
+                <tr className="block md:table-row">
+                  <td
+                    colSpan={7}
+                    className="block px-4 py-10 text-center md:table-cell"
+                  >
                     <p className="text-sm font-medium text-ink-200">
                       {events.length === 0
                         ? "No activity yet"
@@ -185,19 +215,23 @@ export function Activity({ onNavigate }: ActivityProps) {
 function ActivityRow({ event }: { event: ContractEvent }) {
   const meta = eventMeta(event);
   return (
-    <tr className="border-b border-ink-800/60 transition-colors last:border-0 hover:bg-ink-800/30">
-      <td className="px-4 py-3">
+    <tr className="block border-b border-ink-800/60 transition-colors last:border-0 hover:bg-ink-800/30 md:table-row">
+      <td data-label="Event" className={MOBILE_TD_CLASS}>
         <span className="font-medium text-ink-100">{event.topic}</span>
       </td>
-      <td className="px-4 py-3 tabular-nums text-ink-300">
-        {meta.projectId !== null ? `#${meta.projectId}` : "—"}
+      <td data-label="Project" className={MOBILE_TD_CLASS}>
+        <span className="tabular-nums text-ink-300">
+          {meta.projectId !== null ? `#${meta.projectId}` : "—"}
+        </span>
       </td>
-      <td className="px-4 py-3 tabular-nums text-ink-300">
-        {meta.amountStroops
-          ? `${formatStroopsAsUnits(meta.amountStroops)} XLM`
-          : "—"}
+      <td data-label="Amount" className={MOBILE_TD_CLASS}>
+        <span className="tabular-nums text-ink-300">
+          {meta.amountStroops
+            ? `${formatStroopsAsUnits(meta.amountStroops)} XLM`
+            : "—"}
+        </span>
       </td>
-      <td className="px-4 py-3">
+      <td data-label="Wallet" className={MOBILE_TD_CLASS}>
         {meta.wallet ? (
           <span className="font-mono text-xs text-ink-300" title={meta.wallet}>
             {shortenAddress(meta.wallet)}
@@ -206,21 +240,23 @@ function ActivityRow({ event }: { event: ContractEvent }) {
           "—"
         )}
       </td>
-      <td className="px-4 py-3">
+      <td data-label="Tx hash" className={MOBILE_TD_CLASS}>
         <a
           href={explorerTxUrl(event.txHash)}
           target="_blank"
           rel="noopener noreferrer"
           title={event.txHash}
-          className="font-mono text-xs text-navy-300 underline decoration-navy-500/40 underline-offset-2 transition-colors hover:text-navy-200"
+          className="break-all font-mono text-xs text-navy-300 underline decoration-navy-500/40 underline-offset-2 transition-colors hover:text-navy-200"
         >
           {shortenAddress(event.txHash)}
         </a>
       </td>
-      <td className="px-4 py-3 whitespace-nowrap text-xs text-ink-400">
-        {relativeTime(event.timestamp)}
+      <td data-label="Time" className={MOBILE_TD_CLASS}>
+        <span className="text-xs text-ink-400">
+          {relativeTime(event.timestamp)}
+        </span>
       </td>
-      <td className="px-4 py-3">
+      <td data-label="Status" className={MOBILE_TD_CLASS}>
         <span className="text-xs font-medium text-ink-200">
           {meta.statusLabel}
         </span>

@@ -219,10 +219,12 @@ function TotalsBar({ validation }: { validation: MilestonesValidation }) {
     unset: "text-ink-400",
   }[status.kind];
 
+  // Phase 15: on phones the bar floats above the fixed bottom nav (which is
+  // ~56px + safe-area tall) instead of being hidden underneath it.
   return (
     <footer
       aria-live="polite"
-      className="sticky bottom-0 z-10 mt-6 rounded-2xl border border-ink-700 bg-ink-900/95 px-5 py-4 backdrop-blur"
+      className="sticky bottom-16 z-10 mt-6 rounded-2xl border border-ink-700 bg-ink-900/95 px-5 py-4 backdrop-blur md:bottom-0"
     >
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <p className="text-sm text-ink-300">

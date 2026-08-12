@@ -49,7 +49,7 @@ export function WalletButton({ wallet }: WalletButtonProps) {
       <button
         type="button"
         disabled
-        className="inline-flex cursor-wait items-center gap-2 rounded-lg border border-ink-700 bg-ink-800 px-4 py-2 text-sm font-medium text-ink-400"
+        className="inline-flex min-h-11 cursor-wait items-center gap-2 rounded-lg border border-ink-700 bg-ink-800 px-4 py-2 text-sm font-medium text-ink-400 md:min-h-0"
       >
         <SpinnerIcon />
         Connecting…
@@ -65,7 +65,7 @@ export function WalletButton({ wallet }: WalletButtonProps) {
       <div className="inline-flex flex-col items-center gap-2">
         <div className="inline-flex items-center gap-2">
           <div
-            className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 ${
+            className={`inline-flex min-h-11 items-center gap-2 rounded-lg border px-3 py-2 md:min-h-0 ${
               wrongNetwork
                 ? "border-accent-500/40 bg-accent-500/10"
                 : "border-ink-700 bg-ink-800"
@@ -82,7 +82,7 @@ export function WalletButton({ wallet }: WalletButtonProps) {
               type="button"
               onClick={() => void handleCopy()}
               title="Copy full address"
-              className="rounded-md px-1.5 py-0.5 text-xs font-medium text-navy-300 transition-colors hover:bg-ink-700 hover:text-navy-200"
+              className="min-h-9 rounded-md px-1.5 py-0.5 text-xs font-medium text-navy-300 transition-colors hover:bg-ink-700 hover:text-navy-200 md:min-h-0"
             >
               {copied ? "Copied ✓" : "Copy"}
             </button>
@@ -90,7 +90,7 @@ export function WalletButton({ wallet }: WalletButtonProps) {
           <button
             type="button"
             onClick={disconnect}
-            className="rounded-lg px-2 py-2 text-xs font-medium text-ink-400 transition-colors hover:text-red-300"
+            className="min-h-11 rounded-lg px-2 py-2 text-xs font-medium text-ink-400 transition-colors hover:text-red-300 md:min-h-0"
           >
             Disconnect
           </button>
@@ -110,7 +110,7 @@ export function WalletButton({ wallet }: WalletButtonProps) {
       <button
         type="button"
         onClick={() => void connect()}
-        className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all ${
+        className={`inline-flex min-h-11 items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all md:min-h-0 ${
           error
             ? "border border-red-500/40 bg-red-500/10 text-red-200 hover:bg-red-500/20"
             : "bg-navy-600 text-white shadow-glow hover:bg-navy-500"

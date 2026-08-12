@@ -119,7 +119,7 @@ export function OpenDisputeModal({
             onClick={onClose}
             disabled={busy}
             aria-label="Close"
-            className="rounded-md p-1 text-ink-400 transition-colors hover:bg-ink-800 hover:text-ink-100 disabled:cursor-not-allowed disabled:opacity-40"
+            className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-md p-1 text-ink-400 transition-colors hover:bg-ink-800 hover:text-ink-100 disabled:cursor-not-allowed disabled:opacity-40 md:min-h-0 md:min-w-0"
           >
             <CloseIcon className="h-5 w-5" />
           </button>
@@ -203,7 +203,7 @@ export function OpenDisputeModal({
             type="button"
             onClick={onClose}
             disabled={busy}
-            className="rounded-lg border border-ink-700 bg-ink-800 px-4 py-2 text-sm font-medium text-ink-100 transition-colors hover:bg-ink-700 disabled:cursor-not-allowed disabled:opacity-40"
+            className="min-h-11 rounded-lg border border-ink-700 bg-ink-800 px-4 py-2 text-sm font-medium text-ink-100 transition-colors hover:bg-ink-700 disabled:cursor-not-allowed disabled:opacity-40 md:min-h-0"
           >
             {submitted ? "Done" : "Cancel"}
           </button>
@@ -212,7 +212,7 @@ export function OpenDisputeModal({
               type="button"
               onClick={() => void openDispute()}
               disabled={!canSubmit}
-              className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-glow transition-all hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none"
+              className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-glow transition-all hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none md:min-h-0"
             >
               Open dispute
             </button>

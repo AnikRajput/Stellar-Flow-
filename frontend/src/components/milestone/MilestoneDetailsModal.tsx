@@ -129,7 +129,7 @@ export function MilestoneDetailsModal({
             type="button"
             onClick={onClose}
             aria-label="Close milestone details"
-            className="rounded-lg border border-ink-700 p-1.5 text-ink-400 transition-colors hover:bg-ink-800 hover:text-ink-100"
+            className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg border border-ink-700 p-1.5 text-ink-400 transition-colors hover:bg-ink-800 hover:text-ink-100 md:min-h-0 md:min-w-0"
           >
             <svg
               className="h-4 w-4"
