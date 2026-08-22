@@ -1,15 +1,6 @@
 /**
- * WalletGuard gates wallet-dependent UI behind a connected Freighter wallet.
- *
- * While the wallet is disconnected or on the wrong network, children are NOT
- * rendered. Instead a clear, actionable prompt is shown:
- *
- *   - Freighter not installed  → install instructions (via WalletButton error)
- *   - disconnected             → "Connect your wallet" prompt
- *   - wrong network            → "Switch to Testnet" prompt
- *
- * Children render only once the wallet is connected on the expected network
- * (the network configured via `VITE_STELLAR_NETWORK`).
+ * WalletGuard — gates wallet-dependent UI behind a connected Freighter wallet.
+ * Redesigned with premium styling.
  */
 
 import type { ReactNode } from "react";
@@ -33,25 +24,30 @@ export function WalletGuard({ children }: WalletGuardProps) {
 
   return (
     <div className="flex min-h-[60vh] items-center justify-center px-4 py-16">
-      <div className="w-full max-w-md rounded-2xl border border-ink-800 bg-ink-900/80 p-8 text-center shadow-glow">
+      <div className="w-full max-w-md rounded-2xl border border-border-subtle bg-surface-2/80 p-8 text-center shadow-card animate-fade-in">
         <div
           className={`mx-auto mb-5 flex h-12 w-12 items-center justify-center rounded-xl ${
-            wrongNetwork ? "bg-accent-500/15 text-accent-300" : "bg-navy-600/20 text-navy-300"
+            wrongNetwork
+              ? "bg-warning-500/10 text-warning-400"
+              : "bg-accent-500/10 text-accent-400"
           }`}
         >
           {wrongNetwork ? <NetworkIcon /> : <LockIcon />}
         </div>
 
-        <h2 className="text-lg font-semibold text-ink-50">
-          {wrongNetwork ? `Switch to ${EXPECTED_NETWORK_LABEL}` : "Connect your wallet"}
+        <h2 className="text-lg font-semibold text-text-primary">
+          {wrongNetwork
+            ? `Switch to ${EXPECTED_NETWORK_LABEL}`
+            : "Connect your wallet"}
         </h2>
 
-        <p className="mt-2 text-sm leading-relaxed text-ink-400">
+        <p className="mt-2 text-sm leading-relaxed text-text-secondary">
           {wrongNetwork ? (
             <>
-              StellarFlow runs on the {EXPECTED_NETWORK_LABEL} network, but your wallet is
-              connected to a different one. Open Freighter → Settings → Network, switch to{" "}
-              {EXPECTED_NETWORK_LABEL}, then reconnect.
+              StellarFlow runs on the {EXPECTED_NETWORK_LABEL} network, but
+              your wallet is connected to a different one. Open Freighter →
+              Settings → Network, switch to {EXPECTED_NETWORK_LABEL}, then
+              reconnect.
             </>
           ) : (
             "Connect your Freighter wallet to create projects, fund escrow, and release milestone payments."

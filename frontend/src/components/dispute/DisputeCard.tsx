@@ -50,14 +50,14 @@ export function DisputeCard({ dispute, project, milestone }: DisputeCardProps) {
   const statusLabel = dispute.resolved ? "Resolved" : "Open";
 
   return (
-    <article className="rounded-2xl border border-ink-800 bg-ink-900/60 p-5 transition-colors hover:border-ink-700">
+    <article className="rounded-xl border border-border-subtle bg-surface-2/60 p-4 transition-all duration-200 hover:border-border-default hover:bg-surface-3/40">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="text-sm font-semibold text-ink-50">
+          <h3 className="text-[13px] font-semibold text-text-primary">
             Project #{dispute.projectId} ·{" "}
             {dispute.milestoneId > 0 ? `Milestone ${dispute.milestoneId}` : "Milestone —"}
           </h3>
-          <p className="mt-0.5 text-xs text-ink-400">
+          <p className="mt-0.5 text-[11px] text-text-tertiary">
             {dispute.disputeId !== null
               ? `Dispute #${dispute.disputeId}${dispute.disputeIdAuthoritative ? "" : " (approx.)"}`
               : "Dispute id unknown"}
@@ -70,38 +70,38 @@ export function DisputeCard({ dispute, project, milestone }: DisputeCardProps) {
 
       <dl className="mt-4 grid gap-x-6 gap-y-3 sm:grid-cols-3">
         <div>
-          <dt className="text-[11px] uppercase tracking-wide text-ink-500">
+          <dt className="text-[10px] uppercase tracking-wider text-text-muted">
             Opened by
           </dt>
           <dd
-            className="mt-0.5 truncate font-mono text-xs text-ink-100"
+            className="mt-0.5 truncate font-mono text-[11px] text-text-secondary"
             title={dispute.initiator || undefined}
           >
             {dispute.initiator
               ? shortenAddress(dispute.initiator)
               : "Unknown"}
             {role && (
-              <span className="ml-1.5 font-sans text-[11px] text-navy-300">
+              <span className="ml-1.5 font-sans text-[11px] text-accent-400">
                 ({role.toLowerCase()})
               </span>
             )}
           </dd>
         </div>
         <div>
-          <dt className="text-[11px] uppercase tracking-wide text-ink-500">
+          <dt className="text-[10px] uppercase tracking-wider text-text-muted">
             Amount affected
           </dt>
-          <dd className="mt-0.5 text-sm tabular-nums text-ink-100">
+          <dd className="mt-0.5 text-[13px] tabular-nums text-text-secondary">
             {milestone
               ? `${formatStroopsAsUnits(milestone.amount)} XLM`
               : "—"}
           </dd>
         </div>
         <div>
-          <dt className="text-[11px] uppercase tracking-wide text-ink-500">
+          <dt className="text-[10px] uppercase tracking-wider text-text-muted">
             Status
           </dt>
-          <dd className="mt-0.5 text-sm text-ink-100">
+          <dd className="mt-0.5 text-[13px] text-text-secondary">
             {dispute.resolved
               ? dispute.outcome === "ReleasedToFreelancer"
                 ? "Released to freelancer"

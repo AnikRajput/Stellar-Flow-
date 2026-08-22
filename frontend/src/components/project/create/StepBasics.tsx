@@ -49,7 +49,7 @@ export function StepBasics({ name, description, onChange }: StepBasicsProps) {
         />
       </Field>
 
-      <p className="text-xs leading-relaxed text-ink-500">
+      <p className="text-[11px] leading-relaxed text-text-muted">
         Name and description are kept as project metadata in the UI — the escrow
         contract itself stores only the parties, amounts, and milestone names
         on-chain.

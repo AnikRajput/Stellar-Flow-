@@ -252,10 +252,10 @@ export function CreateProject() {
       <div className="mx-auto w-full max-w-3xl px-6 pt-10 pb-24 md:py-10">
         <header className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-ink-50">
+            <h1 className="text-xl font-bold tracking-tight text-text-primary">
               Create Project
             </h1>
-            <p className="mt-1 text-sm text-ink-400">
+            <p className="mt-1 text-sm text-text-secondary">
               Define the scope, hire a freelancer, and escrow milestone
               payments.
             </p>
@@ -265,7 +265,7 @@ export function CreateProject() {
 
         <Stepper current={stepIndex} />
 
-        <div className="mt-8 rounded-2xl border border-ink-800 bg-ink-900/60 p-6">
+        <div className="mt-8 rounded-xl border border-border-subtle bg-surface-2/60 p-6">
           {stepIndex === 0 && (
             <StepBasics
               name={draft.name}
@@ -324,7 +324,7 @@ export function CreateProject() {
         {flow !== "idle" && (
           <div className="mt-6 space-y-3">
             {flow === "running" && (
-              <p className="text-xs text-ink-400">
+              <p className="text-[11px] text-text-tertiary">
                 Step {Math.min(flowStep + 1, createSteps.length)} of{" "}
                 {createSteps.length} — {createSteps[flowStep]?.label}
               </p>
@@ -340,15 +340,14 @@ export function CreateProject() {
               }
             />
             {flow === "failed" && tx.hash && (
-              <p className="text-xs leading-relaxed text-ink-400">
+              <p className="text-[11px] leading-relaxed text-text-tertiary">
                 If the previous attempt actually landed on-chain, retrying may
                 create a duplicate — check the explorer link above first.
               </p>
             )}
             {flow === "failed" && flowError && (
               <p
-                role="alert"
-                className="rounded-xl border border-red-500/30 bg-red-500/5 p-3 text-xs leading-relaxed text-red-200"
+                role="alert"                  className="rounded-xl border border-error-500/20 bg-error-500/5 p-3 text-[11px] leading-relaxed text-error-300"
               >
                 {flowError}
               </p>
@@ -356,12 +355,12 @@ export function CreateProject() {
             {flow === "done" && createdProjectId !== null && (
               <div
                 role="status"
-                className="rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-5"
+                className="rounded-xl border border-success-500/20 bg-success-500/5 p-5"
               >
-                <p className="text-sm font-semibold text-emerald-200">
+                <p className="text-sm font-semibold text-success-300">
                   Project created on-chain
                 </p>
-                <p className="mt-1 text-xs leading-relaxed text-ink-300">
+                <p className="mt-1 text-[11px] leading-relaxed text-text-secondary">
                   Project #{createdProjectId} with {draft.milestones.length}{" "}
                   milestone
                   {draft.milestones.length === 1 ? "" : "s"} — confirmation
@@ -377,7 +376,7 @@ export function CreateProject() {
             type="button"
             onClick={goBack}
             disabled={stepIndex === 0 || submitting}
-            className="min-h-11 rounded-lg border border-ink-700 bg-ink-800 px-4 py-2 text-sm font-medium text-ink-200 transition-colors hover:bg-ink-700 disabled:cursor-not-allowed disabled:opacity-40 md:min-h-0"
+            className="min-h-11 rounded-lg border border-border-default bg-surface-3 px-4 py-2 text-[13px] font-medium text-text-secondary transition-colors hover:bg-surface-4 disabled:cursor-not-allowed disabled:opacity-40 md:min-h-0"
           >
             Back
           </button>
@@ -387,7 +386,7 @@ export function CreateProject() {
               type="button"
               onClick={() => void runFlowFrom(0)}
               disabled={!allValid || submitting}
-              className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-navy-600 px-5 py-2 text-sm font-semibold text-white shadow-glow transition-all hover:bg-navy-500 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none md:min-h-0"
+              className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-accent-gradient px-5 py-2 text-[13px] font-medium text-white shadow-glow-sm transition-all duration-200 hover:shadow-glow hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none md:min-h-0"
             >
               {submitting && <SpinnerIcon />}
               {submitting ? "Creating…" : "Create Project"}
@@ -397,7 +396,7 @@ export function CreateProject() {
               type="button"
               onClick={goNext}
               disabled={!canProceed || submitting}
-              className="min-h-11 rounded-lg bg-navy-600 px-5 py-2 text-sm font-semibold text-white shadow-glow transition-all hover:bg-navy-500 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none md:min-h-0"
+              className="min-h-11 rounded-lg bg-accent-gradient px-5 py-2 text-[13px] font-medium text-white shadow-glow-sm transition-all duration-200 hover:shadow-glow hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none md:min-h-0"
             >
               Next
             </button>
@@ -427,10 +426,10 @@ function Stepper({ current }: { current: number }) {
             <span
               className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold transition-colors ${
                 done
-                  ? "bg-emerald-500/20 text-emerald-300"
+                  ? "bg-success-500/15 text-success-400"
                   : active
-                    ? "bg-navy-600 text-white"
-                    : "bg-ink-800 text-ink-400"
+                    ? "bg-accent-gradient text-white"
+                    : "bg-surface-3 text-text-muted"
               }`}
               aria-hidden="true"
             >
@@ -439,10 +438,10 @@ function Stepper({ current }: { current: number }) {
             <span
               className={
                 active
-                  ? "font-medium text-ink-100"
+                  ? "font-medium text-text-primary"
                   : done
-                    ? "text-ink-300"
-                    : "text-ink-500"
+                    ? "text-text-secondary"
+                    : "text-text-muted"
               }
             >
               {label}
@@ -450,7 +449,7 @@ function Stepper({ current }: { current: number }) {
             {index < STEPS.length - 1 && (
               <span
                 className={`mx-1 h-px w-5 sm:w-8 ${
-                  done ? "bg-emerald-500/40" : "bg-ink-700"
+                  done ? "bg-success-500/40" : "bg-surface-4"
                 }`}
                 aria-hidden="true"
               />

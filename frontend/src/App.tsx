@@ -1,25 +1,20 @@
 /**
- * StellarFlow app shell (routing wiring promised by earlier phases).
+ * StellarFlow app shell — redesigned for premium SaaS look.
  *
- * No router is installed — navigation is state-driven, consistent with how the
- * pages themselves already switch tabs. The shell owns one piece of state:
- * which view is active. Each page keeps its own `SidebarNav` and receives an
- * `onNavigate` callback so the nav works app-wide.
- *
- * Views:
- *  - dashboard / activity / create / project → the real pages built so far
- *  - projects → a real listing (reuses `useProjects` + `ProjectCard`)
- *  - disputes → real dispute listing (Phase 13 — events + real reads)
- *  - settings → real read-only network config from `frontend/.env`
- *
- * No fake data: the projects grid shows skeletons while loading and an honest
- * error state otherwise (project reads are still stubbed this phase).
+ * State-driven navigation (no router). Each page keeps its own SidebarNav
+ * and receives an `onNavigate` callback.
  */
 
 import { useCallback, useState } from "react";
 import { SidebarNav, type NavItemId } from "@/components/layout/SidebarNav";
-import { ProjectCard, ProjectCardSkeleton } from "@/components/project/ProjectCard";
+import { TopHeader } from "@/components/layout/TopHeader";
+import {
+  ProjectCard,
+  ProjectCardSkeleton,
+} from "@/components/project/ProjectCard";
 import { Badge } from "@/components/ui/Badge";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { ErrorState } from "@/components/ui/ErrorState";
 import { WalletButton } from "@/components/wallet/WalletButton";
 import { CONTRACTS, NETWORK, RPC_URL } from "@/config/contracts";
 import { useProjects } from "@/hooks/useProjects";
@@ -32,7 +27,7 @@ import { Disputes } from "@/pages/Disputes";
 import { ProjectDetails } from "@/pages/ProjectDetails";
 import { shortenAddress } from "@/utils/format";
 
-/** The full set of shell views. Nav items map 1:1 to a simple view. */
+/** The full set of shell views. */
 type View =
   | { name: NavItemId }
   | { name: "create" }
@@ -75,8 +70,6 @@ export function App() {
     case "settings":
       return <SettingsView onNavigate={navigate} />;
     case "create":
-      // The wizard has no sidebar of its own — frame it like the other pages so
-      // the user can always navigate away.
       return (
         <div className="flex min-h-screen flex-col md:flex-row">
           <SidebarNav active="projects" onNavigate={navigate} />
@@ -111,96 +104,94 @@ function ProjectsView({
     <div className="flex min-h-screen flex-col md:flex-row">
       <SidebarNav active="projects" onNavigate={onNavigate} />
 
-      <main className="min-w-0 flex-1 px-6 pt-8 pb-24 md:px-10 md:py-8">
-        <header className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-ink-50">
-              Projects
-            </h1>
-            <p className="mt-1 text-sm text-ink-400">
-              All projects you're a party to on this network.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <button
-              type="button"
-              onClick={onCreateProject}
-              className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-navy-600 px-4 py-2 text-sm font-semibold text-white shadow-glow transition-all hover:bg-navy-500 md:min-h-0"
-            >
-              <PlusIcon className="h-4 w-4" />
-              New project
-            </button>
-            <WalletButton wallet={wallet} />
-          </div>
-        </header>
+      <main className="min-w-0 flex-1">
+        <TopHeader
+          title="Projects"
+          subtitle="All projects you're a party to on this network."
+          wallet={wallet}
+          action={{
+            label: "New Project",
+            onClick: onCreateProject,
+            icon: (
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 5v14" />
+                <path d="M5 12h14" />
+              </svg>
+            ),
+          }}
+        />
 
-        {/* Role toggle — same semantics as the Dashboard's role filter. */}
-        <div className="mt-6 inline-flex rounded-lg border border-ink-700 bg-ink-800/60 p-0.5 text-sm">
-          {(["client", "freelancer"] as const).map((r) => (
-            <button
-              key={r}
-              type="button"
-              onClick={() => setRole(r)}
-              aria-pressed={role === r}
-              className={`rounded-md px-3 py-1.5 font-medium capitalize transition-colors ${
-                role === r
-                  ? "bg-navy-600 text-white"
-                  : "text-ink-400 hover:text-ink-100"
-              }`}
-            >
-              {r}
-            </button>
-          ))}
-        </div>
-
-        {loading ? (
-          <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {Array.from({ length: 3 }, (_, i) => (
-              <ProjectCardSkeleton key={i} />
+        <div className="px-6 py-6 lg:px-8">
+          {/* Role toggle */}
+          <div className="inline-flex rounded-lg border border-border-subtle bg-surface-2/60 p-0.5 text-[13px]">
+            {(["client", "freelancer"] as const).map((r) => (
+              <button
+                key={r}
+                type="button"
+                onClick={() => setRole(r)}
+                aria-pressed={role === r}
+                className={`rounded-md px-3 py-1.5 font-medium capitalize transition-all duration-150 ${
+                  role === r
+                    ? "bg-accent-500/15 text-accent-300"
+                    : "text-text-tertiary hover:text-text-secondary"
+                }`}
+              >
+                {r}
+              </button>
             ))}
           </div>
-        ) : error ? (
-          <div
-            role="alert"
-            className="mt-4 rounded-2xl border border-red-500/30 bg-red-500/5 p-8 text-center"
-          >
-            <p className="text-sm font-medium text-red-200">
-              Couldn't load your projects.
-            </p>
-            <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-ink-400">
-              {error.message}
-            </p>
-            <button
-              type="button"
-              onClick={refetch}
-              className="mt-4 inline-flex items-center gap-2 rounded-lg border border-ink-700 bg-ink-800 px-4 py-2 text-sm font-medium text-ink-100 transition-colors hover:bg-ink-700 hover:text-ink-50"
-            >
-              <RetryIcon className="h-4 w-4" />
-              Retry
-            </button>
-          </div>
-        ) : projects.length === 0 ? (
-          <div className="mt-4 rounded-2xl border border-dashed border-ink-700 p-10 text-center">
-            <p className="text-sm font-medium text-ink-200">
-              No {role} projects yet
-            </p>
-            <p className="mt-1 text-xs text-ink-400">
-              Create one, or accept a client's offer — projects you're a party
-              to appear here.
-            </p>
-          </div>
-        ) : (
-          <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {projects.map((project) => (
-              <ProjectCard
-                key={project.id}
-                project={project}
-                role={role}
-                onSelect={() => onOpenProject(project.id)}
+
+          {loading ? (
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {Array.from({ length: 3 }, (_, i) => (
+                <ProjectCardSkeleton key={i} />
+              ))}
+            </div>
+          ) : error ? (
+            <div className="mt-4">
+              <ErrorState
+                title="Couldn't load your projects"
+                message={error.message}
+                onRetry={refetch}
               />
-            ))}
-          </div>
-        )}
+            </div>
+          ) : projects.length === 0 ? (
+            <div className="mt-4">
+              <EmptyState
+                icon={
+                  <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" />
+                    <path d="M12 11v6" />
+                    <path d="M9 14h6" />
+                  </svg>
+                }
+                title={`No ${role} projects yet`}
+                description="Create one, or accept a client's offer — projects you're a party to appear here."
+                action={{
+                  label: "Create Project",
+                  onClick: onCreateProject,
+                  icon: (
+                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 5v14" />
+                      <path d="M5 12h14" />
+                    </svg>
+                  ),
+                }}
+              />
+            </div>
+          ) : (
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {projects.map((project) => (
+                <ProjectCard
+                  key={project.id}
+                  project={project}
+                  role={role}
+                  onSelect={() => onOpenProject(project.id)}
+                />
+              ))}
+            </div>
+          )}
+        </div>
       </main>
     </div>
   );
@@ -223,57 +214,56 @@ function SettingsView({
     <div className="flex min-h-screen flex-col md:flex-row">
       <SidebarNav active="settings" onNavigate={onNavigate} />
 
-      <main className="min-w-0 flex-1 px-6 pt-8 pb-24 md:px-10 md:py-8">
-        <header className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-ink-50">
-              Settings
-            </h1>
-            <p className="mt-1 text-sm text-ink-400">
-              Read-only network configuration from{" "}
-              <code className="font-mono text-xs">frontend/.env</code>.
-            </p>
-          </div>
-          <WalletButton wallet={wallet} />
-        </header>
+      <main className="min-w-0 flex-1">
+        <TopHeader
+          title="Settings"
+          subtitle="Read-only network configuration from frontend/.env."
+          wallet={wallet}
+        />
 
-        <section className="mt-6 max-w-xl rounded-2xl border border-ink-800 bg-ink-900/60">
-          <div className="border-b border-ink-800 px-5 py-4">
-            <h2 className="text-sm font-semibold text-ink-50">Network</h2>
-            <p className="mt-0.5 text-xs text-ink-400">
-              StellarFlow targets a single network per build — switch by editing
-              <code className="font-mono text-xs"> VITE_STELLAR_NETWORK</code>.
-            </p>
-          </div>
-          <dl className="divide-y divide-ink-800/70">
-            <SettingRow label="Network">
-              <Badge tone="green">{EXPECTED_NETWORK_LABEL}</Badge>
-              <span className="ml-2 font-mono text-xs text-ink-500">
-                {NETWORK}
-              </span>
-            </SettingRow>
-            <SettingRow label="RPC endpoint">
-              <code className="break-all font-mono text-xs text-ink-200">
-                {RPC_URL}
-              </code>
-            </SettingRow>
-            {contractRows.map((row) => (
-              <SettingRow key={row.label} label={`${row.label} contract`}>
-                <code
-                  className="font-mono text-xs text-ink-200"
-                  title={row.id}
-                >
-                  {shortenAddress(row.id)}
+        <div className="px-6 py-6 lg:px-8">
+          <section className="max-w-xl rounded-xl border border-border-subtle bg-surface-2/60">
+            <div className="border-b border-border-subtle px-5 py-4">
+              <h2 className="text-sm font-semibold text-text-primary">
+                Network
+              </h2>
+              <p className="mt-0.5 text-xs text-text-tertiary">
+                StellarFlow targets a single network per build — switch by
+                editing{" "}
+                <code className="font-mono text-[11px]">VITE_STELLAR_NETWORK</code>.
+              </p>
+            </div>
+            <dl className="divide-y divide-border-subtle">
+              <SettingRow label="Network">
+                <Badge tone="green">{EXPECTED_NETWORK_LABEL}</Badge>
+                <span className="ml-2 font-mono text-[11px] text-text-tertiary">
+                  {NETWORK}
+                </span>
+              </SettingRow>
+              <SettingRow label="RPC endpoint">
+                <code className="break-all font-mono text-[11px] text-text-secondary">
+                  {RPC_URL}
                 </code>
               </SettingRow>
-            ))}
-          </dl>
-          <p className="border-t border-ink-800 px-5 py-3 text-xs leading-relaxed text-ink-400">
-            Contract IDs come from <code className="font-mono">.env</code>. The
-            bundled values are placeholders until you deploy the contracts and
-            paste their real IDs.
-          </p>
-        </section>
+              {contractRows.map((row) => (
+                <SettingRow key={row.label} label={`${row.label} contract`}>
+                  <code
+                    className="font-mono text-[11px] text-text-secondary"
+                    title={row.id}
+                  >
+                    {shortenAddress(row.id)}
+                  </code>
+                </SettingRow>
+              ))}
+            </dl>
+            <p className="border-t border-border-subtle px-5 py-3 text-[11px] leading-relaxed text-text-tertiary">
+              Contract IDs come from{" "}
+              <code className="font-mono">.env</code>. The bundled values are
+              placeholders until you deploy the contracts and paste their real
+              IDs.
+            </p>
+          </section>
+        </div>
       </main>
     </div>
   );
@@ -288,46 +278,10 @@ function SettingRow({
 }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-2 px-5 py-3">
-      <dt className="text-xs uppercase tracking-wide text-ink-400">{label}</dt>
+      <dt className="text-[11px] uppercase tracking-wider text-text-tertiary">
+        {label}
+      </dt>
       <dd className="flex min-w-0 items-center">{children}</dd>
     </div>
-  );
-}
-
-/* --------------------------------- Icons --------------------------------- */
-
-function PlusIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M12 5v14" />
-      <path d="M5 12h14" />
-    </svg>
-  );
-}
-
-function RetryIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M3 12a9 9 0 1 0 3-6.7" />
-      <path d="M3 4v5h5" />
-    </svg>
   );
 }

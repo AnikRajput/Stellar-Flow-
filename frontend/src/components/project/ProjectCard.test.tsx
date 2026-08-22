@@ -1,9 +1,8 @@
 /**
- * ProjectCard tests (Phase 14).
+ * ProjectCard tests — updated for new premium design.
  *
  * The card is role-aware: `client` shows the freelancer as counterpart + escrow
- * progress + next client action; `freelancer` shows the client as counterpart +
- * the next milestone. Pure component — no mocks needed.
+ * progress + next client action; `freelancer` shows the client as counterpart + the next milestone.
  */
 
 import { render, screen } from "@testing-library/react";
@@ -48,8 +47,8 @@ describe("ProjectCard", () => {
     expect(screen.getByText("Escrow funded")).toBeInTheDocument();
     expect(screen.getByText("40%")).toBeInTheDocument();
     // Underfunded escrow → the client's next step.
-    expect(screen.getByText("Fund remaining escrow")).toBeInTheDocument();
-    expect(screen.getByText(/40 \/ 100 XLM escrowed/)).toBeInTheDocument();
+    expect(screen.getByText("Fund escrow")).toBeInTheDocument();
+    expect(screen.getByText(/40 \/ 100 XLM/)).toBeInTheDocument();
 
     // Client view must not render the freelancer's next-milestone block.
     expect(screen.queryByText("Next milestone")).not.toBeInTheDocument();
@@ -71,7 +70,7 @@ describe("ProjectCard", () => {
 
     // Client-only bits are absent for the freelancer view.
     expect(screen.queryByText("Escrow funded")).not.toBeInTheDocument();
-    expect(screen.queryByText("Fund remaining escrow")).not.toBeInTheDocument();
-    expect(screen.getByText(/40 \/ 100 XLM escrowed/)).toBeInTheDocument();
+    expect(screen.queryByText("Fund escrow")).not.toBeInTheDocument();
+    expect(screen.getByText(/40 \/ 100 XLM/)).toBeInTheDocument();
   });
 });

@@ -1,19 +1,7 @@
 /**
- * Milestone details modal (Phase 10).
+ * Milestone details modal — redesigned with premium colors.
  *
- * Read-only record for one milestone: status, amount, due date, submission
- * note, approval record, payment state, and (when available) the payment
- * transaction hash linked to Stellar Expert's Testnet explorer.
- *
- * Honesty rules: the on-chain `Milestone` struct carries no submission note,
- * approval timestamp, or tx hash — those arrive with event reads (Phase 12) —
- * so the modal renders "—" with an honest context line instead of inventing
- * values. The `txHash` prop is accepted now so Phase 12 can pass it through
- * without changing this component's shape.
- *
- * The explorer URL is the Testnet one specified by the Phase 10 prompt;
- * generalizing it to the configured network is deferred until explorer-network
- * mapping lands.
+ * Read-only record for one milestone: status, amount, due date, etc.
  */
 
 import { useEffect, type ReactNode } from "react";
@@ -25,11 +13,9 @@ import { formatStroopsAsUnits, shortenAddress } from "@/utils/format";
 interface MilestoneDetailsModalProps {
   milestone: Milestone;
   onClose: () => void;
-  /** Payment transaction hash — from event reads (Phase 12). */
   txHash?: string | null;
 }
 
-/** Where the milestone is in the escrow→release flow, from its status. */
 function paymentStateText(status: MilestoneStatus): string {
   switch (status) {
     case "paid":
@@ -47,12 +33,11 @@ function paymentStateText(status: MilestoneStatus): string {
   }
 }
 
-/** What we can honestly say about the approval record from status alone. */
 function approvalRecordText(status: MilestoneStatus): string {
   switch (status) {
     case "paid":
     case "approved":
-      return "Approved by the client — approver + timestamp land with event reads (Phase 12).";
+      return "Approved by the client.";
     case "submitted":
       return "Awaiting client approval.";
     case "pending":
@@ -74,11 +59,13 @@ function formatDue(dueDate: number): string {
 
 function DetailRow({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="flex items-start justify-between gap-4 border-b border-ink-800 pb-3 last:border-0 last:pb-0">
-      <dt className="shrink-0 text-xs font-medium uppercase tracking-wide text-ink-400">
+    <div className="flex items-start justify-between gap-4 border-b border-border-subtle pb-3 last:border-0 last:pb-0">
+      <dt className="shrink-0 text-[11px] font-medium uppercase tracking-wider text-text-tertiary">
         {label}
       </dt>
-      <dd className="min-w-0 text-right text-sm text-ink-100">{children}</dd>
+      <dd className="min-w-0 text-right text-[13px] text-text-secondary">
+        {children}
+      </dd>
     </div>
   );
 }
@@ -88,7 +75,6 @@ export function MilestoneDetailsModal({
   onClose,
   txHash = null,
 }: MilestoneDetailsModalProps) {
-  // Close on Escape — standard modal affordance.
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
@@ -101,9 +87,8 @@ export function MilestoneDetailsModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Backdrop: click closes the modal. */}
       <div
-        className="absolute inset-0 bg-ink-950/80 backdrop-blur-sm"
+        className="absolute inset-0 bg-surface-0/80 backdrop-blur-sm"
         onClick={onClose}
         aria-hidden="true"
       />
@@ -111,17 +96,17 @@ export function MilestoneDetailsModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="milestone-details-title"
-        className="relative w-full max-w-md rounded-2xl border border-ink-800 bg-ink-900 p-6 shadow-glow"
+        className="relative w-full max-w-md rounded-xl border border-border-subtle bg-surface-2 p-6 shadow-card animate-scale-in"
       >
         <header className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <h3
               id="milestone-details-title"
-              className="truncate text-base font-semibold text-ink-50"
+              className="truncate text-base font-semibold text-text-primary"
             >
               {milestone.name}
             </h3>
-            <p className="mt-0.5 text-xs text-ink-400">
+            <p className="mt-0.5 text-[11px] text-text-tertiary">
               Milestone #{milestone.id}
             </p>
           </div>
@@ -129,24 +114,16 @@ export function MilestoneDetailsModal({
             type="button"
             onClick={onClose}
             aria-label="Close milestone details"
-            className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg border border-ink-700 p-1.5 text-ink-400 transition-colors hover:bg-ink-800 hover:text-ink-100 md:min-h-0 md:min-w-0"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border-default p-1.5 text-text-tertiary transition-colors hover:bg-surface-3 hover:text-text-primary"
           >
-            <svg
-              className="h-4 w-4"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              aria-hidden="true"
-            >
+            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
               <path d="M18 6 6 18" />
               <path d="m6 6 12 12" />
             </svg>
           </button>
         </header>
 
-        <dl className="mt-5 space-y-4">
+        <dl className="mt-5 space-y-3.5">
           <DetailRow label="Status">
             <Badge tone={MILESTONE_TONE[milestone.status]}>
               {milestone.status}
@@ -159,9 +136,7 @@ export function MilestoneDetailsModal({
           </DetailRow>
           <DetailRow label="Due date">{formatDue(milestone.dueDate)}</DetailRow>
           <DetailRow label="Submission note">
-            <span className="text-ink-400">
-              — Submission notes land with event reads (Phase 12).
-            </span>
+            <span className="text-text-muted">—</span>
           </DetailRow>
           <DetailRow label="Approval record">
             {approvalRecordText(milestone.status)}
@@ -176,14 +151,12 @@ export function MilestoneDetailsModal({
                 target="_blank"
                 rel="noopener noreferrer"
                 title={txHash}
-                className="font-mono text-xs text-navy-300 underline decoration-navy-500/40 underline-offset-2 transition-colors hover:text-navy-200"
+                className="font-mono text-[11px] text-accent-400 underline decoration-accent-500/30 underline-offset-2 transition-colors hover:text-accent-300"
               >
                 {shortenAddress(txHash)}
               </a>
             ) : (
-              <span className="text-ink-400">
-                — Tx records land with event reads (Phase 12).
-              </span>
+              <span className="text-text-muted">—</span>
             )}
           </DetailRow>
         </dl>

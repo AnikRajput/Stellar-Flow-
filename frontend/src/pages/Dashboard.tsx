@@ -1,17 +1,9 @@
 /**
- * Dashboard (Phase 8).
+ * Dashboard — redesigned for premium SaaS/Web3 look.
  *
- * Assembles: SidebarNav + 4 StatCards + a role-filtered ProjectCard grid +
- * a LIVE activity panel (real escrow events via `useContractEvents` — new
- * on-chain events append without a page reload).
- *
- * Data honesty rules:
- *  - While `useProjects().loading` → Skeleton stat values + skeleton cards.
- *  - On error → clear error state with a Retry button (reads are stubbed until
- *    Phase 9/11, so this is the expected state for now — no fake data).
- *  - "Total Paid" and "Pending Milestones" are not derivable from the Phase 6
- *    `Project` struct, so they render "—" with an honest context line instead
- *    of inventing numbers. They get real values once milestone/paid reads land.
+ * Hero greeting → compact stat cards → project grid → live activity panel.
+ * Data honesty rules preserved: skeletons while loading, error states on failure,
+ * never fabricated data.
  */
 
 import { useMemo } from "react";
@@ -21,25 +13,22 @@ import {
   ProjectCard,
   ProjectCardSkeleton,
 } from "@/components/project/ProjectCard";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { ErrorState } from "@/components/ui/ErrorState";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { StatCard } from "@/components/ui/StatCard";
-import { WalletButton } from "@/components/wallet/WalletButton";
-import { CONTRACTS } from "@/config/contracts";
 import { useContractEvents } from "@/hooks/useContractEvents";
 import { useProjects } from "@/hooks/useProjects";
 import { useWallet } from "@/hooks/useWallet";
 import { formatStroopsAsUnits, parseStroops } from "@/utils/format";
+import { CONTRACTS } from "@/config/contracts";
 
 type Role = "client" | "freelancer";
 
 interface DashboardProps {
-  /** Which side of the escrow the dashboard summarizes. Defaults to "client". */
   role?: Role;
-  /** App-shell nav wiring — forwarded to the page's SidebarNav. */
   onNavigate?: (id: NavItemId) => void;
-  /** Opens a project's details (app shell → ProjectDetails). */
   onOpenProject?: (projectId: number) => void;
-  /** Opens the Create Project wizard (app shell → CreateProject). */
   onCreateProject?: () => void;
 }
 
@@ -49,18 +38,10 @@ export function Dashboard({
   onOpenProject,
   onCreateProject,
 }: DashboardProps) {
-  // Used by WalletButton; useProjects() also creates an instance internally.
-  // Independent instances are fine — Freighter reads are idempotent and there
-  // is no shared mutable state (a context could consolidate this in a later
-  // phase).
   const wallet = useWallet();
   const { projects, loading, error, refetch } = useProjects(role);
-  // Live escrow events — independent of the stubbed project reads, so the
-  // activity panel shows REAL on-chain activity while the grid below is still
-  // in its error state this phase.
-  const { events: activityEvents, loading: activityLoading } = useContractEvents(
-    CONTRACTS.escrow,
-  );
+  const { events: activityEvents, loading: activityLoading } =
+    useContractEvents(CONTRACTS.escrow);
 
   const activeCount = useMemo(
     () => projects.filter((p) => p.status === "active").length,
@@ -68,228 +49,289 @@ export function Dashboard({
   );
 
   const totalEscrowedStroops = useMemo(
-    () => projects.reduce((sum, p) => sum + parseStroops(p.escrowBalance), 0n),
+    () =>
+      projects.reduce((sum, p) => sum + parseStroops(p.escrowBalance), 0n),
     [projects],
   );
 
-  // While loading, stat values swap to Skeletons; on error they swap to "—"
-  // (an error means we don't know the numbers, and 0 would be misleading).
+  // Skeleton while loading, "—" on error
   const statValue = (value: string) =>
-    loading ? <Skeleton className="h-7 w-16 rounded-md" /> : error ? "—" : value;
-  // Cards whose value is never available this phase (no milestone/paid reads)
-  // still pulse during load so all four cards look consistent.
+    loading ? (
+      <Skeleton className="h-7 w-16 rounded" />
+    ) : error ? (
+      "—"
+    ) : (
+      value
+    );
+
   const unavailableValue = loading ? (
-    <Skeleton className="h-7 w-16 rounded-md" />
+    <Skeleton className="h-7 w-16 rounded" />
   ) : (
     "—"
   );
+
+  // Greeting based on time of day
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return "Good morning";
+    if (hour < 17) return "Good afternoon";
+    return "Good evening";
+  };
 
   return (
     <div className="flex min-h-screen flex-col md:flex-row">
       <SidebarNav active="dashboard" onNavigate={onNavigate} />
 
-      <main className="min-w-0 flex-1 px-6 pt-8 pb-24 md:px-10 md:py-8">
-        <header className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-ink-50">
-              Dashboard
-            </h1>
-            <p className="mt-1 text-sm text-ink-400">
-              Escrow and milestone overview for your projects.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
+      <main className="min-w-0 flex-1">
+        {/* Hero Section */}
+        <div className="relative overflow-hidden border-b border-border-subtle bg-hero-gradient px-6 py-8 lg:px-8">
+          {/* Background decoration */}
+          <div className="absolute -top-24 -right-24 h-64 w-64 rounded-full bg-accent-500/[0.03] blur-3xl" />
+          <div className="absolute -bottom-32 -left-32 h-80 w-80 rounded-full bg-violet-500/[0.02] blur-3xl" />
+
+          <div className="relative flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight text-text-primary">
+                {getGreeting()} 👋
+              </h1>
+              <p className="mt-1.5 text-sm text-text-secondary">
+                Here's what's happening with your projects today.
+              </p>
+            </div>
+
             {onCreateProject && (
-              <button
-                type="button"
-                onClick={onCreateProject}
-                className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-navy-600 px-4 py-2 text-sm font-semibold text-white shadow-glow transition-all hover:bg-navy-500 md:min-h-0"
-              >
-                <PlusIcon className="h-4 w-4" />
-                New project
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={onCreateProject}
+                  className="inline-flex items-center gap-2 rounded-lg bg-accent-gradient px-4 py-2.5 text-[13px] font-medium text-white shadow-glow-sm transition-all duration-200 hover:shadow-glow hover:brightness-110 active:scale-[0.98]"
+                >
+                  <PlusIcon className="h-4 w-4" />
+                  New Project
+                </button>
+              </div>
             )}
-            <WalletButton wallet={wallet} />
           </div>
-        </header>
+        </div>
 
-        <section
-          className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
-          aria-label="Overview stats"
-        >
-          <StatCard
-            label="Active Projects"
-            value={statValue(String(activeCount))}
-            context={
-              error
-                ? "Unavailable while reads are down"
-                : `${projects.length} total in list`
-            }
-            icon={<ProjectsIcon />}
-            tone="green"
-          />
-          <StatCard
-            label="Total Escrowed"
-            value={statValue(
-              formatStroopsAsUnits(totalEscrowedStroops.toString()),
-            )}
-            context={
-              error
-                ? "Unavailable while reads are down"
-                : `Across ${projects.length} project${projects.length === 1 ? "" : "s"}`
-            }
-            icon={<VaultIcon />}
-            tone="navy"
-          />
-          <StatCard
-            label="Total Paid"
-            value={unavailableValue}
-            context="Wired up with milestone reads (Phase 9)"
-            icon={<PaidIcon />}
-            tone="accent"
-          />
-          <StatCard
-            label="Pending Milestones"
-            value={unavailableValue}
-            context="Wired up with milestone reads (Phase 9)"
-            icon={<MilestoneIcon />}
-            tone="amber"
-          />
-        </section>
+        <div className="px-6 py-6 lg:px-8">
+          {/* Stats Grid */}
+          <section
+            className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
+            aria-label="Overview stats"
+          >
+            <StatCard
+              label="Active Projects"
+              value={statValue(String(activeCount))}
+              context={
+                error
+                  ? "Unavailable"
+                  : `${projects.length} total`
+              }
+              icon={<ProjectsIcon />}
+              tone="accent"
+              trend={
+                !loading && !error && projects.length > 0
+                  ? { value: "from list", direction: "neutral" }
+                  : undefined
+              }
+            />
+            <StatCard
+              label="Total Escrowed"
+              value={statValue(
+                formatStroopsAsUnits(totalEscrowedStroops.toString()),
+              )}
+              context={
+                error
+                  ? "Unavailable"
+                  : `Across ${projects.length} project${projects.length === 1 ? "" : "s"}`
+              }
+              icon={<VaultIcon />}
+              tone="purple"
+            />
+            <StatCard
+              label="Total Paid"
+              value={unavailableValue}
+              context="Milestone reads pending"
+              icon={<PaidIcon />}
+              tone="green"
+            />
+            <StatCard
+              label="Pending Milestones"
+              value={unavailableValue}
+              context="Milestone reads pending"
+              icon={<MilestoneIcon />}
+              tone="amber"
+            />
+          </section>
 
-        <section className="mt-10" aria-label="Your projects">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-lg font-semibold text-ink-50">Your Projects</h2>
-            <span className="text-xs text-ink-400">Viewing as {role}</span>
-          </div>
-
-          {loading ? (
-            <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              {Array.from({ length: 3 }, (_, i) => (
-                <ProjectCardSkeleton key={i} />
-              ))}
+          {/* Projects Section */}
+          <section className="mt-8" aria-label="Your projects">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-base font-semibold text-text-primary">
+                Your Projects
+              </h2>
+              <span className="text-[11px] text-text-tertiary">
+                Viewing as {role}
+              </span>
             </div>
-          ) : error ? (
-            <ProjectsErrorState message={error.message} onRetry={refetch} />
-          ) : projects.length === 0 ? (
-            <div className="mt-4 rounded-2xl border border-dashed border-ink-700 p-10 text-center">
-              <p className="text-sm font-medium text-ink-200">
-                No {role} projects yet
-              </p>
-              <p className="mt-1 text-xs text-ink-400">
-                Projects you create or join will appear here.
-              </p>
-            </div>
-          ) : (
-            <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              {projects.map((project) => (
-                <ProjectCard
-                  key={project.id}
-                  project={project}
-                  role={role}
-                  onSelect={
-                    onOpenProject ? () => onOpenProject(project.id) : undefined
+
+            <div className="mt-4">
+              {loading ? (
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                  {Array.from({ length: 3 }, (_, i) => (
+                    <ProjectCardSkeleton key={i} />
+                  ))}
+                </div>
+              ) : error ? (
+                <ErrorState
+                  title="Couldn't load your projects"
+                  message={error.message}
+                  onRetry={refetch}
+                />
+              ) : projects.length === 0 ? (
+                <EmptyState
+                  icon={
+                    <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" />
+                      <path d="M12 11v6" />
+                      <path d="M9 14h6" />
+                    </svg>
+                  }
+                  title="No projects yet"
+                  description="Create your first escrow project and securely manage payments through milestones."
+                  action={
+                    onCreateProject
+                      ? {
+                          label: "Create Your First Project",
+                          onClick: onCreateProject,
+                          icon: (
+                            <PlusIcon className="h-4 w-4" />
+                          ),
+                        }
+                      : undefined
                   }
                 />
-              ))}
+              ) : (
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                  {projects.map((project) => (
+                    <ProjectCard
+                      key={project.id}
+                      project={project}
+                      role={role}
+                      onSelect={
+                        onOpenProject
+                          ? () => onOpenProject(project.id)
+                          : undefined
+                      }
+                    />
+                  ))}
+                </div>
+              )}
             </div>
-          )}
-        </section>
+          </section>
 
-        <section className="mt-10" aria-label="Activity">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-lg font-semibold text-ink-50">Activity</h2>
-            <span className="text-xs text-ink-400">
-              Live — polls the RPC every ~5s
-            </span>
-          </div>
-          <div className="mt-4 space-y-2">
-            {activityLoading ? (
-              <div className="rounded-2xl border border-ink-800 bg-ink-900/60 p-4">
-                <Skeleton className="h-12 w-full rounded-lg" />
-                <Skeleton className="mt-2 h-12 w-full rounded-lg" />
-                <Skeleton className="mt-2 h-12 w-full rounded-lg" />
-              </div>
-            ) : activityEvents.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-ink-700 p-8 text-center">
-                <ActivityIcon className="mx-auto h-6 w-6 text-ink-500" />
-                <p className="mt-3 text-sm font-medium text-ink-200">
-                  No activity yet
-                </p>
-                <p className="mt-1 text-xs text-ink-400">
-                  Events emitted by the escrow contract appear here as they
-                  land on-chain.
-                </p>
-              </div>
-            ) : (
-              activityEvents.slice(0, 8).map((event, index) => (
-                <ActivityFeedRow
-                  key={`${event.ledger}:${event.txHash}:${event.topic}:${index}`}
-                  event={event}
-                  compact
+          {/* Activity Section */}
+          <section className="mt-8" aria-label="Activity">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-base font-semibold text-text-primary">
+                Recent Activity
+              </h2>
+              <span className="text-[11px] text-text-tertiary">
+                Live · polls RPC every ~5s
+              </span>
+            </div>
+
+            <div className="mt-4 space-y-2">
+              {activityLoading ? (
+                <div className="space-y-2">
+                  {Array.from({ length: 3 }, (_, i) => (
+                    <div
+                      key={i}
+                      className="rounded-xl border border-border-subtle bg-surface-2/60 p-2.5"
+                    >
+                      <div className="flex items-start gap-3">
+                        <Skeleton className="h-7 w-7 shrink-0 rounded-lg" />
+                        <div className="flex-1 space-y-1.5">
+                          <Skeleton className="h-3.5 w-3/4 rounded" />
+                          <Skeleton className="h-2.5 w-1/2 rounded" />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : activityEvents.length === 0 ? (
+                <EmptyState
+                  icon={
+                    <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M3 12h4l2-7 4 14 2-7h6" />
+                    </svg>
+                  }
+                  title="No activity yet"
+                  description="Events emitted by the escrow contract appear here as they land on-chain."
                 />
-              ))
-            )}
-          </div>
-        </section>
+              ) : (
+                <>
+                  {activityEvents.slice(0, 6).map((event, index) => (
+                    <ActivityFeedRow
+                      key={`${event.ledger}:${event.txHash}:${event.topic}:${index}`}
+                      event={event}
+                      compact
+                    />
+                  ))}
+                  {activityEvents.length > 6 && (
+                    <button
+                      type="button"
+                      onClick={() => onNavigate?.("activity")}
+                      className="w-full rounded-xl border border-border-subtle bg-surface-2/40 py-2.5 text-center text-[12px] font-medium text-accent-400 transition-all duration-200 hover:border-border-default hover:bg-surface-3/40"
+                    >
+                      View All Activity ({activityEvents.length})
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+          </section>
+        </div>
       </main>
     </div>
   );
 }
 
-function ProjectsErrorState({
-  message,
-  onRetry,
-}: {
-  message: string;
-  onRetry: () => void;
-}) {
-  return (
-    <div
-      role="alert"
-      className="mt-4 rounded-2xl border border-red-500/30 bg-red-500/5 p-8 text-center"
-    >
-      <p className="text-sm font-medium text-red-200">
-        Couldn't load your projects.
-      </p>
-      <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-ink-400">
-        {message}
-      </p>
-      <button
-        type="button"
-        onClick={onRetry}
-        className="mt-4 inline-flex items-center gap-2 rounded-lg border border-ink-700 bg-ink-800 px-4 py-2 text-sm font-medium text-ink-100 transition-colors hover:bg-ink-700 hover:text-ink-50"
-      >
-        <RetryIcon className="h-4 w-4" />
-        Retry
-      </button>
-    </div>
-  );
-}
-
-function ProjectsIcon() {
-  return (
-    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <rect x="3" y="3" width="7" height="9" rx="1.5" />
-      <rect x="14" y="3" width="7" height="5" rx="1.5" />
-      <rect x="14" y="12" width="7" height="9" rx="1.5" />
-      <rect x="3" y="16" width="7" height="5" rx="1.5" />
-    </svg>
-  );
-}
+/* --------------------------------- Icons --------------------------------- */
 
 function PlusIcon({ className }: { className?: string }) {
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
       <path d="M12 5v14" />
       <path d="M5 12h14" />
     </svg>
   );
 }
 
+function ProjectsIcon() {
+  return (
+    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3" y="3" width="7" height="7" rx="1.5" />
+      <rect x="14" y="3" width="7" height="7" rx="1.5" />
+      <rect x="3" y="14" width="7" height="7" rx="1.5" />
+      <rect x="14" y="14" width="7" height="7" rx="1.5" />
+    </svg>
+  );
+}
+
 function VaultIcon() {
   return (
-    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <rect x="3" y="4" width="18" height="16" rx="2" />
       <circle cx="12" cy="12" r="3" />
       <path d="M3 9h3" />
@@ -302,7 +344,7 @@ function VaultIcon() {
 
 function PaidIcon() {
   return (
-    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <circle cx="12" cy="12" r="9" />
       <path d="m8.5 12 2.5 2.5 4.5-5" />
     </svg>
@@ -311,26 +353,9 @@ function PaidIcon() {
 
 function MilestoneIcon() {
   return (
-    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M5 3v18" />
       <path d="M5 5h11l-2 3 2 3H5" />
-    </svg>
-  );
-}
-
-function ActivityIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M3 12h4l2-7 4 14 2-7h6" />
-    </svg>
-  );
-}
-
-function RetryIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M3 12a9 9 0 1 0 3-6.7" />
-      <path d="M3 4v5h5" />
     </svg>
   );
 }

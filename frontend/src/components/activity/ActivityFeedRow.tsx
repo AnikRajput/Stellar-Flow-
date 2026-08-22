@@ -1,10 +1,9 @@
 /**
- * Activity feed row (Phase 12).
+ * Activity feed row — redesigned for premium look.
  *
  * One line of the live activity feed: a per-event-type icon, a one-line human
- * description (shared `eventMeta`), the relative time, and a link to the
- * transaction on Stellar Expert. `compact` is the Dashboard variant — smaller
- * and without the topic chip.
+ * description, the relative time, and a link to the transaction on Stellar Expert.
+ * `compact` is the Dashboard variant — smaller and without the topic chip.
  */
 
 import type { SVGProps } from "react";
@@ -19,23 +18,38 @@ interface ActivityFeedRowProps {
   compact?: boolean;
 }
 
-/** Icon tint per event type — semantic (green/amber/red) for money flows. */
+/** Icon tint per event type — semantic colors. */
 const TOPIC_TINT: Record<ContractEventName, string> = {
-  FUNDS_DEPOSITED: "bg-navy-500/15 text-navy-300",
-  MILESTONE_CREATED: "bg-ink-700 text-ink-300",
-  MILESTONE_SUBMITTED: "bg-amber-500/15 text-amber-300",
-  MILESTONE_APPROVED: "bg-emerald-500/15 text-emerald-300",
-  PAYMENT_RELEASED: "bg-emerald-500/15 text-emerald-300",
-  DISPUTE_OPENED: "bg-red-500/15 text-red-300",
-  DISPUTE_RESOLVED: "bg-amber-500/15 text-amber-300",
-  PROJECT_CANCELLED: "bg-ink-700 text-ink-400",
-  REFUND_ISSUED: "bg-navy-500/15 text-navy-300",
-  PROJECT_COMPLETED: "bg-emerald-500/15 text-emerald-300",
-  FUNDS_HELD: "bg-navy-500/15 text-navy-300",
-  FUNDS_RELEASED: "bg-emerald-500/15 text-emerald-300",
-  FUNDS_REFUNDED: "bg-navy-500/15 text-navy-300",
-  PROJECT_CREATED: "bg-emerald-500/15 text-emerald-300",
-  PROJECT_PAUSED: "bg-amber-500/15 text-amber-300",
+  FUNDS_DEPOSITED:
+    "bg-accent-500/10 text-accent-400",
+  MILESTONE_CREATED:
+    "bg-surface-4 text-text-secondary",
+  MILESTONE_SUBMITTED:
+    "bg-warning-500/10 text-warning-400",
+  MILESTONE_APPROVED:
+    "bg-success-500/10 text-success-400",
+  PAYMENT_RELEASED:
+    "bg-success-500/10 text-success-400",
+  DISPUTE_OPENED:
+    "bg-error-500/10 text-error-400",
+  DISPUTE_RESOLVED:
+    "bg-warning-500/10 text-warning-400",
+  PROJECT_CANCELLED:
+    "bg-surface-4 text-text-tertiary",
+  REFUND_ISSUED:
+    "bg-accent-500/10 text-accent-400",
+  PROJECT_COMPLETED:
+    "bg-success-500/10 text-success-400",
+  FUNDS_HELD:
+    "bg-accent-500/10 text-accent-400",
+  FUNDS_RELEASED:
+    "bg-success-500/10 text-success-400",
+  FUNDS_REFUNDED:
+    "bg-accent-500/10 text-accent-400",
+  PROJECT_CREATED:
+    "bg-success-500/10 text-success-400",
+  PROJECT_PAUSED:
+    "bg-warning-500/10 text-warning-400",
 };
 
 export function ActivityFeedRow({ event, compact = false }: ActivityFeedRowProps) {
@@ -43,7 +57,7 @@ export function ActivityFeedRow({ event, compact = false }: ActivityFeedRowProps
 
   return (
     <article
-      className={`flex items-start gap-3 rounded-xl border border-ink-800 bg-ink-900/50 transition-colors hover:border-ink-700 ${
+      className={`flex items-start gap-3 rounded-xl border border-border-subtle bg-surface-2/60 transition-all duration-200 hover:border-border-default hover:bg-surface-3/40 ${
         compact ? "p-2.5" : "p-3"
       }`}
     >
@@ -53,22 +67,26 @@ export function ActivityFeedRow({ event, compact = false }: ActivityFeedRowProps
           compact ? "h-7 w-7" : "h-8 w-8"
         }`}
       >
-        <TopicIcon topic={event.topic} className={compact ? "h-3.5 w-3.5" : "h-4 w-4"} />
+        <TopicIcon
+          topic={event.topic}
+          className={compact ? "h-3.5 w-3.5" : "h-4 w-4"}
+        />
       </span>
 
       <div className="min-w-0 flex-1">
-        <p className={`text-ink-100 ${compact ? "text-xs" : "text-sm"}`}>
+        <p
+          className={`text-text-primary ${compact ? "text-xs" : "text-sm"}`}
+        >
           {meta.summary}
           {meta.amountStroops && (
-            <span className="font-medium tabular-nums text-ink-50">
-              {" · "}
-              {formatStroopsAsUnits(meta.amountStroops)} XLM
+            <span className="ml-1 font-medium tabular-nums text-text-primary">
+              · {formatStroopsAsUnits(meta.amountStroops)} XLM
             </span>
           )}
         </p>
-        <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-ink-400">
+        <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-text-tertiary">
           {!compact && (
-            <span className="font-medium uppercase tracking-wide text-ink-500">
+            <span className="font-medium uppercase tracking-wider text-text-muted">
               {event.topic}
             </span>
           )}
@@ -78,7 +96,7 @@ export function ActivityFeedRow({ event, compact = false }: ActivityFeedRowProps
             target="_blank"
             rel="noopener noreferrer"
             title={event.txHash}
-            className="font-mono text-navy-300 underline decoration-navy-500/40 underline-offset-2 transition-colors hover:text-navy-200"
+            className="font-mono text-accent-400 underline decoration-accent-500/30 underline-offset-2 transition-colors hover:text-accent-300"
           >
             {shortenAddress(event.txHash)}
           </a>
@@ -88,7 +106,13 @@ export function ActivityFeedRow({ event, compact = false }: ActivityFeedRowProps
   );
 }
 
-function TopicIcon({ topic, className }: { topic: ContractEventName; className?: string }) {
+function TopicIcon({
+  topic,
+  className,
+}: {
+  topic: ContractEventName;
+  className?: string;
+}) {
   const shared: SVGProps<SVGSVGElement> = {
     viewBox: "0 0 24 24",
     fill: "none",

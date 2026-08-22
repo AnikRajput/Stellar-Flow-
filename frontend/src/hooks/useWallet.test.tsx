@@ -1,14 +1,12 @@
 /**
  * useWallet tests (Phase 14).
  *
- * Mocks the `@stellar/freighter-api` module (never touches a real extension)
- * and controls the `window.freighter` bridge presence so the hook's own
- * `isFreighterInstalled()` check can be exercised in both directions.
+ * Mocks the `@stellar/freighter-api` module (never touches a real extension).
  *
  * Asserted transitions:
  *   - disconnected → connected → disconnected (connect + disconnect)
  *   - declined requestAccess → `declined` error
- *   - missing bridge → `not-installed` error
+ *   - failed requestAccess → `not-installed` error
  */
 
 import { act, renderHook } from "@testing-library/react";
@@ -27,16 +25,7 @@ const freighter = vi.hoisted(() => ({
 
 vi.mock("@stellar/freighter-api", () => freighter);
 
-/** Removes the injected bridge (used by the not-installed case). */
-function removeBridge(): void {
-  Reflect.deleteProperty(window, "freighter");
-}
-
 beforeEach(() => {
-  // The hook detects installation via `"freighter" in window` — inject the
-  // bridge for the connected paths; each test overrides the API responses.
-  Object.defineProperty(window, "freighter", { value: {}, configurable: true });
-
   freighter.isConnected.mockResolvedValue({
     isConnected: false,
     error: undefined,
@@ -54,7 +43,6 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  removeBridge();
   vi.clearAllMocks();
 });
 
@@ -98,8 +86,9 @@ describe("useWallet", () => {
     expect(result.current.error?.code).toBe("declined");
   });
 
-  it("reports `not-installed` when the Freighter bridge is absent", async () => {
-    removeBridge();
+  it("reports `not-installed` when requestAccess fails", async () => {
+    // Simulate Freighter not being installed — requestAccess throws.
+    freighter.requestAccess.mockRejectedValue(new Error("Freighter is not installed"));
 
     const { result } = renderHook(() => useWallet());
     await act(async () => {
@@ -109,7 +98,6 @@ describe("useWallet", () => {
     expect(result.current.status).toBe("disconnected");
     expect(result.current.address).toBeNull();
     expect(result.current.error?.code).toBe("not-installed");
-    // No wallet API calls happen without the bridge.
-    expect(freighter.requestAccess).not.toHaveBeenCalled();
+    expect(freighter.requestAccess).toHaveBeenCalledTimes(1);
   });
 });

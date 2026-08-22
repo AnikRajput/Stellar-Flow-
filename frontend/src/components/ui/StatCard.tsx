@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
-/** Icon-chip tones — matches the semantic set plus the two brand tones. */
-export type StatTone = "navy" | "accent" | "green" | "amber" | "red" | "gray";
+/** Icon-chip tones */
+export type StatTone = "accent" | "green" | "amber" | "purple";
 
 interface StatCardProps {
   /** Short label above the value (e.g. "Active Projects"). */
@@ -12,17 +12,27 @@ interface StatCardProps {
   context?: ReactNode;
   /** Optional icon rendered in a tinted chip. */
   icon?: ReactNode;
-  /** Icon-chip tone. Defaults to `navy`. */
+  /** Icon-chip tone. Defaults to `accent`. */
   tone?: StatTone;
+  /** Optional trend indicator (e.g. "+20% from last month"). */
+  trend?: {
+    value: string;
+    direction: "up" | "down" | "neutral";
+  };
 }
 
 const CHIP_CLASSES: Record<StatTone, string> = {
-  navy: "bg-navy-600/15 text-navy-300",
-  accent: "bg-accent-500/15 text-accent-300",
-  green: "bg-emerald-500/15 text-emerald-300",
-  amber: "bg-amber-500/15 text-amber-300",
-  red: "bg-red-500/15 text-red-300",
-  gray: "bg-ink-700/40 text-ink-300",
+  accent: "bg-accent-500/10 text-accent-400",
+  green: "bg-success-500/10 text-success-400",
+  amber: "bg-warning-500/10 text-warning-400",
+  purple: "bg-violet-500/10 text-violet-400",
+};
+
+const ICON_BG: Record<StatTone, string> = {
+  accent: "from-accent-500/20 to-violet-500/10",
+  green: "from-success-500/20 to-emerald-500/10",
+  amber: "from-warning-500/20 to-amber-500/10",
+  purple: "from-violet-500/20 to-purple-500/10",
 };
 
 export function StatCard({
@@ -30,31 +40,52 @@ export function StatCard({
   value,
   context,
   icon,
-  tone = "navy",
+  tone = "accent",
+  trend,
 }: StatCardProps) {
   return (
-    <div className="rounded-2xl border border-ink-800 bg-ink-900/60 p-5 transition-colors hover:border-ink-700">
-      <div className="flex items-start justify-between gap-3">
-        <p className="text-xs font-semibold uppercase tracking-wider text-ink-400">
-          {label}
-        </p>
+    <div className="group relative overflow-hidden rounded-xl border border-border-subtle bg-surface-2/80 p-4 transition-all duration-200 hover:border-border-default hover:bg-surface-3/60 hover:shadow-card">
+      {/* Subtle gradient overlay on hover */}
+      <div className="absolute inset-0 bg-gradient-to-br from-accent-500/[0.02] to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+
+      <div className="relative flex items-start justify-between gap-3">
+        <div className="flex-1 min-w-0">
+          <p className="text-[11px] font-medium uppercase tracking-wider text-text-tertiary">
+            {label}
+          </p>
+          <div className="mt-2 text-2xl font-semibold tabular-nums text-text-primary">
+            {value}
+          </div>
+          <div className="mt-2 flex items-center gap-2">
+            {context && (
+              <div className="text-xs text-text-tertiary">{context}</div>
+            )}
+            {trend && (
+              <span
+                className={`text-xs font-medium ${
+                  trend.direction === "up"
+                    ? "text-success-400"
+                    : trend.direction === "down"
+                      ? "text-error-400"
+                      : "text-text-tertiary"
+                }`}
+              >
+                {trend.direction === "up" && "↑ "}
+                {trend.direction === "down" && "↓ "}
+                {trend.value}
+              </span>
+            )}
+          </div>
+        </div>
         {icon && (
           <span
-            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${CHIP_CLASSES[tone]}`}
+            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br ${ICON_BG[tone]} ${CHIP_CLASSES[tone]}`}
             aria-hidden="true"
           >
             {icon}
           </span>
         )}
       </div>
-      <div className="mt-3 text-2xl font-semibold tabular-nums text-ink-50">
-        {value}
-      </div>
-      {context && (
-        <div className="mt-1.5 text-xs leading-relaxed text-ink-400">
-          {context}
-        </div>
-      )}
     </div>
   );
 }

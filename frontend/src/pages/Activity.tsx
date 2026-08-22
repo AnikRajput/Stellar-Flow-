@@ -1,23 +1,15 @@
 /**
- * Activity page (Phase 12).
+ * Activity page — redesigned for premium look.
  *
- * A filterable table of the escrow contract's on-chain events, driven by
- * `useContractEvents(CONTRACTS.escrow)`: a recent history page on mount, then
- * new events APPEND LIVE via honest polling (Soroban RPC has no push channel —
- * the page notes the ~5s poll interval). Filter by event type and search
- * across project / wallet / tx hash / summary.
- *
- * Honesty notes: the history window covers the last
- * `DEFAULT_HISTORY_LOOKBACK_LEDGERS` ledgers (testnet ≈ a few hours), and if
- * the RPC is unreachable the table shows an empty state while polling
- * continues — no fabricated events.
+ * Filterable table of escrow contract on-chain events, driven by
+ * `useContractEvents(CONTRACTS.escrow)`. New events append live via polling.
  */
 
 import { useMemo, useState } from "react";
 import { SidebarNav, type NavItemId } from "@/components/layout/SidebarNav";
+import { TopHeader } from "@/components/layout/TopHeader";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { WalletButton } from "@/components/wallet/WalletButton";
-import { CONTRACTS } from "@/config/contracts";
 import { useContractEvents } from "@/hooks/useContractEvents";
 import { useWallet } from "@/hooks/useWallet";
 import type { ContractEvent, ContractEventName } from "@/types/event";
@@ -28,6 +20,7 @@ import {
   shortenAddress,
 } from "@/utils/format";
 import { eventMeta } from "@/utils/eventMeta";
+import { CONTRACTS } from "@/config/contracts";
 
 const ALL_EVENT_TYPES: readonly ContractEventName[] = [
   "FUNDS_DEPOSITED",
@@ -44,7 +37,6 @@ const ALL_EVENT_TYPES: readonly ContractEventName[] = [
 
 type TypeFilter = "all" | ContractEventName;
 
-/** Table column order — also the labels for the mobile card rows. */
 const COLUMN_LABELS = [
   "Event",
   "Project",
@@ -55,17 +47,10 @@ const COLUMN_LABELS = [
   "Status",
 ] as const;
 
-/**
- * Phase 15: below `md` the table's cells become stacked card rows. Each cell
- * shows its column label (from `data-label`, rendered by the ::before pseudo)
- * followed by the value; at `md+` the label pseudo is hidden and the cells
- * return to real table cells.
- */
 const MOBILE_TD_CLASS =
-  "block px-4 py-1.5 md:table-cell md:px-4 md:py-3 before:mr-2 before:text-[11px] before:font-medium before:uppercase before:tracking-wider before:text-ink-500 before:content-[attr(data-label)] md:before:hidden";
+  "block px-4 py-1.5 md:table-cell md:px-4 md:py-3 before:mr-2 before:text-[10px] before:font-medium before:uppercase before:tracking-wider before:text-text-muted before:content-[attr(data-label)] md:before:hidden";
 
 interface ActivityProps {
-  /** App-shell nav wiring — forwarded to the page's SidebarNav. */
   onNavigate?: (id: NavItemId) => void;
 }
 
@@ -99,113 +84,105 @@ export function Activity({ onNavigate }: ActivityProps) {
     <div className="flex min-h-screen flex-col md:flex-row">
       <SidebarNav active="activity" onNavigate={onNavigate} />
 
-      <main className="min-w-0 flex-1 px-6 pt-8 pb-24 md:px-10 md:py-8">
-        <header className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-ink-50">
-              Activity
-            </h1>
-            <p className="mt-1 text-sm text-ink-400">
-              On-chain events from the escrow contract.
+      <main className="min-w-0 flex-1">
+        <TopHeader
+          title="Activity"
+          subtitle="On-chain events from the escrow contract."
+          wallet={wallet}
+        />
+
+        <div className="px-6 py-6 lg:px-8">
+          {/* Filters */}
+          <div className="flex flex-wrap items-center gap-3">
+            <label className="flex items-center gap-2 text-sm text-text-secondary">
+              <span>Type</span>
+              <select
+                value={typeFilter}
+                onChange={(event) =>
+                  setTypeFilter(event.target.value as TypeFilter)
+                }
+                className="rounded-lg border border-border-default bg-surface-2/80 px-3 py-1.5 text-[13px] text-text-primary outline-none transition-colors focus:border-accent-500"
+              >
+                <option value="all">All events</option>
+                {ALL_EVENT_TYPES.map((topic) => (
+                  <option key={topic} value={topic}>
+                    {topic}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <input
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search project, wallet, tx hash…"
+              aria-label="Search events"
+              className="w-full max-w-xs rounded-lg border border-border-default bg-surface-2/80 px-3 py-1.5 text-[13px] text-text-primary placeholder:text-text-muted outline-none transition-colors focus:border-accent-500"
+            />
+
+            <p className="ml-auto text-[11px] text-text-tertiary">
+              Live · polls RPC every ~5s
             </p>
           </div>
-          <WalletButton wallet={wallet} />
-        </header>
 
-        {/* Filters */}
-        <div className="mt-6 flex flex-wrap items-center gap-3">
-          <label className="flex items-center gap-2 text-sm text-ink-400">
-            <span>Type</span>
-            <select
-              value={typeFilter}
-              onChange={(event) =>
-                setTypeFilter(event.target.value as TypeFilter)
-              }
-              className="min-h-11 rounded-lg border border-ink-700 bg-ink-900 px-3 py-2 text-sm text-ink-100 outline-none transition-colors focus:border-navy-500 sm:min-h-0"
-            >
-              <option value="all">All events</option>
-              {ALL_EVENT_TYPES.map((topic) => (
-                <option key={topic} value={topic}>
-                  {topic}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <input
-            type="search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search project, wallet, tx hash…"
-            aria-label="Search events"
-            className="w-full min-h-11 max-w-xs rounded-lg border border-ink-700 bg-ink-900 px-3 py-2 text-sm text-ink-100 placeholder:text-ink-500 outline-none transition-colors focus:border-navy-500 sm:min-h-0"
-          />
-
-          <p className="ml-auto text-xs text-ink-400">
-            Live — polls the RPC every ~5s
-          </p>
-        </div>
-
-        {/* Table — card rows on mobile, a real table at md+. */}
-        <div className="mt-4 overflow-x-auto rounded-2xl border border-ink-800 bg-ink-900/60">
-          <table className="w-full border-collapse text-sm md:min-w-[720px]">
-            <thead className="hidden md:table-header-group">
-              <tr className="border-b border-ink-800 text-left text-xs uppercase tracking-wide text-ink-400">
-                <th className="px-4 py-3 font-medium">Event</th>
-                <th className="px-4 py-3 font-medium">Project</th>
-                <th className="px-4 py-3 font-medium">Amount</th>
-                <th className="px-4 py-3 font-medium">Wallet</th>
-                <th className="px-4 py-3 font-medium">Tx hash</th>
-                <th className="px-4 py-3 font-medium">Time</th>
-                <th className="px-4 py-3 font-medium">Status</th>
-              </tr>
-            </thead>
-            <tbody className="block md:table-row-group">
-              {loading ? (
-                Array.from({ length: 5 }, (_, index) => (
-                  <tr
-                    key={index}
-                    className="block border-b border-ink-800/60 last:border-0 md:table-row"
-                  >
-                    {COLUMN_LABELS.map((label, cell) => (
-                      <td
-                        key={cell}
-                        data-label={label}
-                        className={MOBILE_TD_CLASS}
-                      >
-                        <Skeleton className="h-4 w-full rounded-md" />
-                      </td>
-                    ))}
-                  </tr>
-                ))
-              ) : filtered.length === 0 ? (
-                <tr className="block md:table-row">
-                  <td
-                    colSpan={7}
-                    className="block px-4 py-10 text-center md:table-cell"
-                  >
-                    <p className="text-sm font-medium text-ink-200">
-                      {events.length === 0
-                        ? "No activity yet"
-                        : "No events match your filters"}
-                    </p>
-                    <p className="mt-1 text-xs text-ink-400">
-                      {events.length === 0
-                        ? "Events emitted by the escrow contract appear here as they land on-chain."
-                        : "Try a different event type or search term."}
-                    </p>
-                  </td>
+          {/* Table */}
+          <div className="mt-4 overflow-x-auto rounded-xl border border-border-subtle bg-surface-2/40">
+            <table className="w-full border-collapse text-[13px] md:min-w-[720px]">
+              <thead className="hidden md:table-header-group">
+                <tr className="border-b border-border-subtle text-left text-[11px] uppercase tracking-wider text-text-muted">
+                  <th className="px-4 py-3 font-medium">Event</th>
+                  <th className="px-4 py-3 font-medium">Project</th>
+                  <th className="px-4 py-3 font-medium">Amount</th>
+                  <th className="px-4 py-3 font-medium">Wallet</th>
+                  <th className="px-4 py-3 font-medium">Tx hash</th>
+                  <th className="px-4 py-3 font-medium">Time</th>
+                  <th className="px-4 py-3 font-medium">Status</th>
                 </tr>
-              ) : (
-                filtered.map((event, index) => (
-                  <ActivityRow
-                    key={`${event.ledger}:${event.txHash}:${event.topic}:${index}`}
-                    event={event}
-                  />
-                ))
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="block md:table-row-group">
+                {loading ? (
+                  Array.from({ length: 5 }, (_, index) => (
+                    <tr
+                      key={index}
+                      className="block border-b border-border-subtle/60 last:border-0 md:table-row"
+                    >
+                      {COLUMN_LABELS.map((label, cell) => (
+                        <td key={cell} data-label={label} className={MOBILE_TD_CLASS}>
+                          <Skeleton className="h-3.5 w-full rounded" />
+                        </td>
+                      ))}
+                    </tr>
+                  ))
+                ) : filtered.length === 0 ? (
+                  <tr className="block md:table-row">
+                    <td
+                      colSpan={7}
+                      className="block px-4 py-10 text-center md:table-cell"
+                    >
+                      <p className="text-sm font-medium text-text-secondary">
+                        {events.length === 0
+                          ? "No activity yet"
+                          : "No events match your filters"}
+                      </p>
+                      <p className="mt-1 text-xs text-text-tertiary">
+                        {events.length === 0
+                          ? "Events emitted by the escrow contract appear here as they land on-chain."
+                          : "Try a different event type or search term."}
+                      </p>
+                    </td>
+                  </tr>
+                ) : (
+                  filtered.map((event, index) => (
+                    <ActivityRow
+                      key={`${event.ledger}:${event.txHash}:${event.topic}:${index}`}
+                      event={event}
+                    />
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </main>
     </div>
@@ -215,17 +192,17 @@ export function Activity({ onNavigate }: ActivityProps) {
 function ActivityRow({ event }: { event: ContractEvent }) {
   const meta = eventMeta(event);
   return (
-    <tr className="block border-b border-ink-800/60 transition-colors last:border-0 hover:bg-ink-800/30 md:table-row">
+    <tr className="block border-b border-border-subtle/60 transition-colors last:border-0 hover:bg-surface-3/30 md:table-row">
       <td data-label="Event" className={MOBILE_TD_CLASS}>
-        <span className="font-medium text-ink-100">{event.topic}</span>
+        <span className="font-medium text-text-primary">{event.topic}</span>
       </td>
       <td data-label="Project" className={MOBILE_TD_CLASS}>
-        <span className="tabular-nums text-ink-300">
+        <span className="tabular-nums text-text-secondary">
           {meta.projectId !== null ? `#${meta.projectId}` : "—"}
         </span>
       </td>
       <td data-label="Amount" className={MOBILE_TD_CLASS}>
-        <span className="tabular-nums text-ink-300">
+        <span className="tabular-nums text-text-secondary">
           {meta.amountStroops
             ? `${formatStroopsAsUnits(meta.amountStroops)} XLM`
             : "—"}
@@ -233,7 +210,10 @@ function ActivityRow({ event }: { event: ContractEvent }) {
       </td>
       <td data-label="Wallet" className={MOBILE_TD_CLASS}>
         {meta.wallet ? (
-          <span className="font-mono text-xs text-ink-300" title={meta.wallet}>
+          <span
+            className="font-mono text-[11px] text-text-secondary"
+            title={meta.wallet}
+          >
             {shortenAddress(meta.wallet)}
           </span>
         ) : (
@@ -246,18 +226,18 @@ function ActivityRow({ event }: { event: ContractEvent }) {
           target="_blank"
           rel="noopener noreferrer"
           title={event.txHash}
-          className="break-all font-mono text-xs text-navy-300 underline decoration-navy-500/40 underline-offset-2 transition-colors hover:text-navy-200"
+          className="break-all font-mono text-[11px] text-accent-400 underline decoration-accent-500/30 underline-offset-2 transition-colors hover:text-accent-300"
         >
           {shortenAddress(event.txHash)}
         </a>
       </td>
       <td data-label="Time" className={MOBILE_TD_CLASS}>
-        <span className="text-xs text-ink-400">
+        <span className="text-[11px] text-text-tertiary">
           {relativeTime(event.timestamp)}
         </span>
       </td>
       <td data-label="Status" className={MOBILE_TD_CLASS}>
-        <span className="text-xs font-medium text-ink-200">
+        <span className="text-[11px] font-medium text-text-secondary">
           {meta.statusLabel}
         </span>
       </td>

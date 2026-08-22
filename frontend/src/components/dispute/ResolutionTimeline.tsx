@@ -62,35 +62,33 @@ export function ResolutionTimeline({
       {/* Connector track behind the dots. */}
       <div
         aria-hidden="true"
-        className="absolute bottom-8 left-[11px] top-4 w-0.5 -translate-x-1/2 bg-ink-800"
+        className="absolute bottom-8 left-[11px] top-4 w-0.5 -translate-x-1/2 bg-surface-4"
       />
 
       <Step
         icon={<FlagIcon />}
-        dotClassName="border-red-500/50 text-red-300"
+        dotClassName="border-error-500/50 text-error-400"
         title="Dispute opened"
       >
-        <p className="mt-1 text-xs leading-relaxed text-ink-400">
+        <p className="mt-1 text-[11px] leading-relaxed text-text-tertiary">
           Opened by{" "}
-          <span className="font-mono text-ink-200" title={dispute.initiator}>
+          <span className="font-mono text-text-secondary" title={dispute.initiator}>
             {dispute.initiator ? shortenAddress(dispute.initiator) : "unknown address"}
           </span>{" "}
           · {relativeTime(dispute.openedAt)}
         </p>
         {dispute.reason ? (
-          <blockquote className="mt-2 rounded-lg border-l-2 border-red-500/40 bg-red-500/5 px-3 py-2 text-xs italic leading-relaxed text-ink-200">
+          <blockquote className="mt-2 rounded-lg border-l-2 border-error-500/40 bg-error-500/5 px-3 py-2 text-[11px] italic leading-relaxed text-text-secondary">
             “{dispute.reason}”
           </blockquote>
         ) : (
-          <p className="mt-2 text-xs text-ink-500">
-            Reason unavailable — this dispute opened outside the recent history
-            window.
+          <p className="mt-2 text-[11px] text-text-muted">            Reason unavailable — opened outside recent history.
           </p>
         )}
         {milestone && (
-          <p className="mt-2 text-xs tabular-nums text-ink-400">
+          <p className="mt-2 text-[11px] tabular-nums text-text-tertiary">
             Amount affected:{" "}
-            <span className="font-semibold text-ink-100">
+            <span className="font-semibold text-text-primary">
               {formatStroopsAsUnits(milestone.amount)} XLM
             </span>{" "}
             · Milestone {dispute.milestoneId}
@@ -101,21 +99,21 @@ export function ResolutionTimeline({
       {dispute.resolved ? (
         <Step
           icon={<GavelIcon />}
-          dotClassName="border-emerald-500/50 text-emerald-300"
+          dotClassName="border-success-500/50 text-success-400"
           title="Dispute resolved"
         >
-          <p className="mt-1 text-xs leading-relaxed text-ink-400">
+          <p className="mt-1 text-[11px] leading-relaxed text-text-tertiary">
             {relativeTime(dispute.resolvedAt ?? 0)}
           </p>
         </Step>
       ) : (
         <Step
           icon={<HourglassIcon />}
-          dotClassName="border-amber-500/50 text-amber-300"
+          dotClassName="border-warning-500/50 text-warning-400"
           title="Under arbitrator review"
           pulsing
         >
-          <p className="mt-1 text-xs leading-relaxed text-ink-400">
+          <p className="mt-1 text-[11px] leading-relaxed text-text-tertiary">
             Awaiting a resolution decision from the escrow's arbitrator.
           </p>
         </Step>
@@ -126,7 +124,7 @@ export function ResolutionTimeline({
         dotClassName={
           dispute.resolved
             ? OUTCOME_DOT_CLASSES[dispute.outcome ?? "RefundedToClient"]
-            : "border-ink-600 text-ink-400"
+            : "border-border-default text-text-tertiary"
         }
         title={
           dispute.resolved
@@ -146,8 +144,8 @@ export function ResolutionTimeline({
             </span>
           </div>
         ) : (
-          <p className="mt-1 text-xs leading-relaxed text-ink-400">
-            Escrowed funds stay held until the arbitrator decides.
+          <p className="mt-1 text-[11px] leading-relaxed text-text-tertiary">
+            Funds stay held until the arbitrator decides.
           </p>
         )}
       </Step>
@@ -177,14 +175,14 @@ function Step({
     <li className="relative flex gap-4 pb-8 last:pb-0">
       <span
         aria-hidden="true"
-        className={`relative z-10 mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border bg-ink-900 ${dotClassName} ${
+        className={`relative z-10 mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border bg-surface-1 ${dotClassName} ${
           pulsing ? "animate-pulse" : ""
         }`}
       >
         {icon}
       </span>
-      <div className="min-w-0 flex-1 rounded-xl border border-ink-800 bg-ink-900/60 p-4">
-        <p className="text-sm font-semibold text-ink-50">{title}</p>
+      <div className="min-w-0 flex-1 rounded-xl border border-border-subtle bg-surface-2/60 p-3.5">
+        <p className="text-[13px] font-semibold text-text-primary">{title}</p>
         {children}
       </div>
     </li>

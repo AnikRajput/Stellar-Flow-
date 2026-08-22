@@ -1,17 +1,11 @@
 /**
- * Role-aware project card.
+ * Role-aware project card — redesigned for premium look.
  *
- *  - `role="client"`     → freelancer avatar/address + escrow/progress bar +
- *                          next action needed
+ *  - `role="client"`     → freelancer avatar/address + escrow/progress bar + next action
  *  - `role="freelancer"` → client avatar/address + next milestone due + status
  *
- * Status badges use the semantic green/amber/red/gray set — never the brand
- * accent. Addresses are shortened + given a deterministic avatar because no
- * profile names exist on-chain yet; nothing here fabricates data.
- *
- * The optional `milestones` prop refines progress/next-step details. No hook
- * returns milestones in Phase 8, so without it the card falls back to escrow
- * funding + status-based text.
+ * Status badges use semantic green/amber/red/gray set.
+ * Addresses are shortened + given a deterministic avatar.
  */
 
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
@@ -26,22 +20,13 @@ interface ProjectCardProps {
   project: Project;
   /** Which side of the escrow this card is viewed from. */
   role: Role;
-  /**
-   * Optional milestone list (reads land in Phase 9). When omitted, progress is
-   * derived from escrow funding and no milestone-level details are claimed.
-   */
+  /** Optional milestone list. */
   milestones?: Milestone[];
-  /**
-   * When provided, the card becomes a keyboard-accessible button that calls
-   * this handler (app shell navigates to the project's details).
-   */
+  /** When provided, card becomes clickable. */
   onSelect?: () => void;
 }
 
-/**
- * Project status → semantic badge tone.
- * Exported for ProjectDetails + milestone components to reuse the same set.
- */
+/** Project status → semantic badge tone. */
 export const STATUS_TONE: Record<ProjectStatus, BadgeTone> = {
   active: "green",
   completed: "green",
@@ -50,10 +35,7 @@ export const STATUS_TONE: Record<ProjectStatus, BadgeTone> = {
   paused: "amber",
 };
 
-/**
- * Milestone status → semantic badge tone.
- * Exported for milestone components to reuse the same set.
- */
+/** Milestone status → semantic badge tone. */
 export const MILESTONE_TONE: Record<MilestoneStatus, BadgeTone> = {
   pending: "gray",
   submitted: "amber",
@@ -63,17 +45,17 @@ export const MILESTONE_TONE: Record<MilestoneStatus, BadgeTone> = {
   cancelled: "gray",
 };
 
-/** Deterministic avatar tint per address (stable across renders). */
+/** Deterministic avatar tint per address. */
 const AVATAR_CLASSES = [
-  "bg-navy-600/40 text-navy-200",
-  "bg-accent-500/20 text-accent-200",
-  "bg-emerald-600/30 text-emerald-200",
-  "bg-amber-600/30 text-amber-200",
-  "bg-red-600/30 text-red-200",
-  "bg-ink-700 text-ink-200",
+  "bg-accent-500/15 text-accent-300",
+  "bg-violet-500/15 text-violet-300",
+  "bg-success-500/15 text-success-300",
+  "bg-warning-500/15 text-warning-300",
+  "bg-error-500/15 text-error-300",
+  "bg-surface-4 text-text-secondary",
 ];
 
-/** Exported for ProjectDetails + milestone components to reuse the same avatar. */
+/** Exported for ProjectDetails + milestone components. */
 export function avatarClass(address: string): string {
   let hash = 0;
   for (let i = 0; i < address.length; i++) {
@@ -82,7 +64,7 @@ export function avatarClass(address: string): string {
   return AVATAR_CLASSES[hash % AVATAR_CLASSES.length];
 }
 
-/** i128 stroop string → number (0 on malformed input, see `parseStroops`). */
+/** i128 stroop string → number. */
 function toNumber(stroops: string): number {
   return Number(parseStroops(stroops));
 }
@@ -92,7 +74,7 @@ interface ProgressInfo {
   label: string;
 }
 
-/** Completion % from milestones when available, else escrow funding %. */
+/** Completion % from milestones or escrow funding. */
 function projectProgress(
   project: Project,
   milestones: Milestone[],
@@ -103,15 +85,18 @@ function projectProgress(
     ).length;
     return {
       percent: Math.round((done / milestones.length) * 100),
-      label: `${done}/${milestones.length} milestones complete`,
+      label: `${done}/${milestones.length} milestones`,
     };
   }
   const total = toNumber(project.totalAmount);
   if (total <= 0) {
-    return { percent: 0, label: "Escrow funded" };
+    return { percent: 0, label: "No escrow" };
   }
   return {
-    percent: Math.min(100, Math.round((toNumber(project.escrowBalance) / total) * 100)),
+    percent: Math.min(
+      100,
+      Math.round((toNumber(project.escrowBalance) / total) * 100),
+    ),
     label: "Escrow funded",
   };
 }
@@ -121,39 +106,36 @@ interface ActionInfo {
   tone: "amber" | "green" | "gray";
 }
 
-/** Next step a client must take, derived from real project/milestone state. */
+/** Next step a client must take. */
 function clientNextAction(
   project: Project,
   milestones: Milestone[],
 ): ActionInfo {
   if (milestones.some((m) => m.status === "submitted")) {
-    return { text: "Approve submitted work", tone: "amber" };
+    return { text: "Review submitted work", tone: "amber" };
   }
   switch (project.status) {
     case "disputed":
-      return { text: "Resolve active dispute", tone: "amber" };
+      return { text: "Resolve dispute", tone: "amber" };
     case "paused":
-      return { text: "Paused — needs review", tone: "amber" };
+      return { text: "Paused", tone: "amber" };
     case "cancelled":
       return { text: "Cancelled", tone: "gray" };
     case "completed":
-      return { text: "Completed — all settled", tone: "green" };
+      return { text: "Completed", tone: "green" };
     case "active":
       break;
   }
-  if (
-    milestones.length > 0 &&
-    milestones.every((m) => m.status === "paid")
-  ) {
-    return { text: "All milestones paid", tone: "green" };
+  if (milestones.length > 0 && milestones.every((m) => m.status === "paid")) {
+    return { text: "All paid", tone: "green" };
   }
   if (toNumber(project.escrowBalance) < toNumber(project.totalAmount)) {
-    return { text: "Fund remaining escrow", tone: "amber" };
+    return { text: "Fund escrow", tone: "amber" };
   }
-  return { text: "Escrow funded — awaiting submission", tone: "gray" };
+  return { text: "Awaiting submission", tone: "gray" };
 }
 
-/** Earliest pending/submitted milestone by due date, or null. */
+/** Earliest pending/submitted milestone by due date. */
 function nextMilestone(milestones: Milestone[]): Milestone | null {
   const upcoming = milestones
     .filter((m) => m.status === "pending" || m.status === "submitted")
@@ -169,9 +151,9 @@ function formatDue(dueDate: number): string {
 }
 
 const ACTION_TONE_CLASS: Record<ActionInfo["tone"], string> = {
-  amber: "font-medium text-amber-300",
-  green: "font-medium text-emerald-300",
-  gray: "text-ink-400",
+  amber: "text-warning-400",
+  green: "text-success-400",
+  gray: "text-text-tertiary",
 };
 
 export function ProjectCard({
@@ -183,10 +165,10 @@ export function ProjectCard({
   const counterpartAddress =
     role === "client" ? project.freelancer : project.client;
   const progress = projectProgress(project, milestones);
-  const nextAction = role === "client" ? clientNextAction(project, milestones) : null;
+  const nextAction =
+    role === "client" ? clientNextAction(project, milestones) : null;
   const upcoming = role === "freelancer" ? nextMilestone(milestones) : null;
-  const overdue =
-    upcoming !== null && upcoming.dueDate * 1000 < Date.now();
+  const overdue = upcoming !== null && upcoming.dueDate * 1000 < Date.now();
 
   return (
     <article
@@ -204,110 +186,119 @@ export function ProjectCard({
       role={onSelect ? "button" : undefined}
       tabIndex={onSelect ? 0 : undefined}
       aria-label={onSelect ? `Open project #${project.id} details` : undefined}
-      className={`flex flex-col gap-4 rounded-2xl border border-ink-800 bg-ink-900/60 p-5 transition-all hover:-translate-y-0.5 hover:border-ink-700 hover:shadow-glow ${
-        onSelect ? "cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-navy-400" : ""
+      className={`group relative flex flex-col gap-3 rounded-xl border border-border-subtle bg-surface-2/60 p-4 transition-all duration-200 hover:border-border-default hover:bg-surface-3/40 hover:shadow-card ${
+        onSelect
+          ? "cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-400"
+          : ""
       }`}
     >
-      <header className="flex items-start justify-between gap-3">
-        <h3 className="text-sm font-semibold text-ink-50">
-          Project #{project.id}
-        </h3>
-        <Badge tone={STATUS_TONE[project.status]}>{project.status}</Badge>
-      </header>
+      {/* Subtle gradient overlay on hover */}
+      <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-accent-500/[0.02] to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
 
-      <div className="flex items-center gap-3">
-        <span
-          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${avatarClass(counterpartAddress)}`}
-          aria-hidden="true"
-        >
-          {counterpartAddress.slice(1, 3).toUpperCase()}
-        </span>
-        <div className="min-w-0">
-          <p className="text-xs font-medium uppercase tracking-wide text-ink-400">
-            {role === "client" ? "Freelancer" : "Client"}
-          </p>
-          <p className="truncate font-mono text-sm text-ink-100">
-            {shortenAddress(counterpartAddress)}
-          </p>
-        </div>
-      </div>
+      <div className="relative">
+        <header className="flex items-center justify-between gap-2">
+          <h3 className="text-[13px] font-semibold text-text-primary">
+            Project #{project.id}
+          </h3>
+          <Badge tone={STATUS_TONE[project.status]}>{project.status}</Badge>
+        </header>
 
-      {role === "client" ? (
-        <div>
-          <div className="flex items-center justify-between text-xs text-ink-400">
-            <span>{progress.label}</span>
-            <span className="tabular-nums text-ink-200">{progress.percent}%</span>
-          </div>
-          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-ink-800">
-            <div
-              className="h-full rounded-full bg-navy-500 transition-all duration-500"
-              style={{ width: `${progress.percent}%` }}
-            />
-          </div>
-        </div>
-      ) : upcoming ? (
-        <div className="rounded-lg border border-ink-800 bg-ink-800/40 p-3">
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-xs text-ink-400">Next milestone</p>
-            <Badge tone={MILESTONE_TONE[upcoming.status]}>
-              {upcoming.status}
-            </Badge>
-          </div>
-          <p className="mt-1 truncate text-sm font-medium text-ink-100">
-            {upcoming.name}
-          </p>
-          <p
-            className={`mt-0.5 text-xs ${
-              overdue ? "font-medium text-red-300" : "text-ink-400"
-            }`}
+        <div className="mt-3 flex items-center gap-2.5">
+          <span
+            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${avatarClass(counterpartAddress)}`}
+            aria-hidden="true"
           >
-            {overdue ? "Overdue — was due " : "Due "}
-            {formatDue(upcoming.dueDate)}
-          </p>
-        </div>
-      ) : (
-        <p className="text-xs text-ink-400">
-          {milestones.length > 0
-            ? "All milestones settled."
-            : "Milestone reads land in Phase 9."}
-        </p>
-      )}
-
-      <footer className="mt-auto flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-ink-800 pt-3 text-xs text-ink-400">
-        <span className="tabular-nums">
-          {formatStroopsAsUnits(project.escrowBalance)} /{" "}
-          {formatStroopsAsUnits(project.totalAmount)} XLM escrowed
-        </span>
-        {nextAction && (
-          <span className={ACTION_TONE_CLASS[nextAction.tone]}>
-            {nextAction.text}
+            {counterpartAddress.slice(1, 3).toUpperCase()}
           </span>
+          <div className="min-w-0">
+            <p className="text-[10px] font-medium uppercase tracking-wider text-text-tertiary">
+              {role === "client" ? "Freelancer" : "Client"}
+            </p>
+            <p className="truncate font-mono text-xs text-text-secondary">
+              {shortenAddress(counterpartAddress)}
+            </p>
+          </div>
+        </div>
+
+        {role === "client" ? (
+          <div className="mt-3">
+            <div className="flex items-center justify-between text-[11px] text-text-tertiary">
+              <span>{progress.label}</span>
+              <span className="tabular-nums text-text-secondary">
+                {progress.percent}%
+              </span>
+            </div>
+            <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-surface-4">
+              <div
+                className="h-full rounded-full bg-accent-gradient transition-all duration-500"
+                style={{ width: `${progress.percent}%` }}
+              />
+            </div>
+          </div>
+        ) : upcoming ? (
+          <div className="mt-3 rounded-lg border border-border-subtle bg-surface-3/60 p-2.5">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[10px] text-text-tertiary">Next milestone</p>
+              <Badge tone={MILESTONE_TONE[upcoming.status]}>
+                {upcoming.status}
+              </Badge>
+            </div>
+            <p className="mt-1 truncate text-xs font-medium text-text-primary">
+              {upcoming.name}
+            </p>
+            <p
+              className={`mt-0.5 text-[11px] ${
+                overdue ? "font-medium text-error-400" : "text-text-tertiary"
+              }`}
+            >
+              {overdue ? "Overdue · Due " : "Due "}
+              {formatDue(upcoming.dueDate)}
+            </p>
+          </div>
+        ) : (
+          <p className="mt-3 text-[11px] text-text-tertiary">
+            {milestones.length > 0
+              ? "All milestones settled"
+              : "No milestone data"}
+          </p>
         )}
-      </footer>
+
+        <footer className="mt-3 flex flex-wrap items-center justify-between gap-x-2 gap-y-1 border-t border-border-subtle pt-2.5 text-[11px] text-text-tertiary">
+          <span className="tabular-nums">
+            {formatStroopsAsUnits(project.escrowBalance)} /{" "}
+            {formatStroopsAsUnits(project.totalAmount)} XLM
+          </span>
+          {nextAction && (
+            <span className={ACTION_TONE_CLASS[nextAction.tone]}>
+              {nextAction.text}
+            </span>
+          )}
+        </footer>
+      </div>
     </article>
   );
 }
 
-/** Mirrors the ProjectCard layout so loading state doesn't shift the grid. */
+/** Mirrors the ProjectCard layout for loading state. */
 export function ProjectCardSkeleton() {
   return (
-    <div className="rounded-2xl border border-ink-800 bg-ink-900/60 p-5">
-      <div className="flex items-start justify-between gap-3">
-        <Skeleton className="h-4 w-24 rounded-md" />
-        <Skeleton className="h-5 w-16 rounded-full" />
+    <div className="rounded-xl border border-border-subtle bg-surface-2/60 p-4">
+      <div className="flex items-center justify-between gap-2">
+        <Skeleton className="h-3.5 w-24 rounded" />
+        <Skeleton className="h-4 w-16 rounded-full" />
       </div>
-      <div className="mt-5 flex items-center gap-3">
-        <Skeleton className="h-10 w-10 rounded-full" />
-        <div className="flex-1 space-y-2">
-          <Skeleton className="h-3 w-20 rounded-md" />
-          <Skeleton className="h-4 w-32 rounded-md" />
+      <div className="mt-3 flex items-center gap-2.5">
+        <Skeleton className="h-8 w-8 rounded-full" />
+        <div className="flex-1 space-y-1.5">
+          <Skeleton className="h-2.5 w-16 rounded" />
+          <Skeleton className="h-3 w-28 rounded" />
         </div>
       </div>
-      <div className="mt-5 space-y-2">
-        <Skeleton className="h-3 w-full rounded-md" />
-        <Skeleton className="h-3 w-3/4 rounded-md" />
+      <div className="mt-3 space-y-1.5">
+        <Skeleton className="h-2.5 w-full rounded" />
+        <Skeleton className="h-1 w-full rounded-full" />
       </div>
-      <Skeleton className="mt-5 h-4 w-40 rounded-md" />
+      <Skeleton className="mt-3 h-3 w-36 rounded" />
     </div>
   );
 }

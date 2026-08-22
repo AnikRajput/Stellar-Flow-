@@ -1,16 +1,8 @@
 /**
- * Wallet connection button.
+ * Wallet connection button — redesigned for premium look.
  *
- * Renders four states with distinct visual treatment — never a bare
- * "Connect" button with no feedback:
- *
- *   - disconnected → primary "Connect Wallet" action
- *   - connecting   → disabled button with a spinner
- *   - connected    → shortened address (GABC…WXYZ) with copy-to-clipboard
- *   - error        → red-flagged button + human-readable message
- *
- * The `wallet` object comes from `useWallet()` so this button is driven by
- * the same state the rest of the app reads.
+ * Four states: disconnected → connecting → connected → error.
+ * Clean, compact pill design with copy functionality.
  */
 
 import { useState } from "react";
@@ -39,64 +31,66 @@ export function WalletButton({ wallet }: WalletButtonProps) {
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1500);
     } catch {
-      // Clipboard unavailable (e.g. insecure context) — no fake success.
       setCopied(false);
     }
   }
 
   if (status === "connecting") {
     return (
-      <button
-        type="button"
-        disabled
-        className="inline-flex min-h-11 cursor-wait items-center gap-2 rounded-lg border border-ink-700 bg-ink-800 px-4 py-2 text-sm font-medium text-ink-400 md:min-h-0"
-      >
-        <SpinnerIcon />
+      <div className="inline-flex items-center gap-2 rounded-lg border border-border-default bg-surface-2/80 px-3 py-1.5 text-[13px] text-text-tertiary">
+        <svg
+          className="h-3.5 w-3.5 animate-spin"
+          viewBox="0 0 24 24"
+          fill="none"
+        >
+          <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25" />
+          <path d="M4 12a8 8 0 0 1 8-8" stroke="currentColor" strokeWidth="4" strokeLinecap="round" />
+        </svg>
         Connecting…
-      </button>
+      </div>
     );
   }
 
   if (status === "connected" && address) {
-    // Connected on the wrong network is still an error state: keep the
-    // address visible but flag it with a warning treatment + message.
     const wrongNetwork = error?.code === "wrong-network";
     return (
       <div className="inline-flex flex-col items-center gap-2">
         <div className="inline-flex items-center gap-2">
           <div
-            className={`inline-flex min-h-11 items-center gap-2 rounded-lg border px-3 py-2 md:min-h-0 ${
+            className={`inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 ${
               wrongNetwork
-                ? "border-accent-500/40 bg-accent-500/10"
-                : "border-ink-700 bg-ink-800"
+                ? "border-warning-500/30 bg-warning-500/5"
+                : "border-border-default bg-surface-2/80"
             }`}
           >
             <span
-              className={`h-2 w-2 shrink-0 rounded-full ${wrongNetwork ? "bg-accent-400" : "bg-emerald-400"}`}
+              className={`h-2 w-2 shrink-0 rounded-full ${
+                wrongNetwork ? "bg-warning-400" : "bg-success-400"
+              }`}
               aria-hidden="true"
             />
-            <span className="font-mono text-sm font-medium text-ink-100">
+            <span className="font-mono text-[13px] font-medium text-text-primary">
               {shortenAddress(address)}
             </span>
             <button
               type="button"
               onClick={() => void handleCopy()}
               title="Copy full address"
-              className="min-h-9 rounded-md px-1.5 py-0.5 text-xs font-medium text-navy-300 transition-colors hover:bg-ink-700 hover:text-navy-200 md:min-h-0"
+              className="rounded px-1.5 py-0.5 text-[11px] text-accent-400 transition-colors hover:bg-surface-3 hover:text-accent-300"
             >
-              {copied ? "Copied ✓" : "Copy"}
+              {copied ? "✓" : "Copy"}
             </button>
           </div>
           <button
             type="button"
             onClick={disconnect}
-            className="min-h-11 rounded-lg px-2 py-2 text-xs font-medium text-ink-400 transition-colors hover:text-red-300 md:min-h-0"
+            className="rounded-lg px-2 py-1.5 text-[11px] font-medium text-text-tertiary transition-colors hover:text-error-400"
           >
             Disconnect
           </button>
         </div>
         {wrongNetwork && (
-          <p role="alert" className="max-w-xs text-center text-xs leading-relaxed text-accent-300">
+          <p role="alert" className="max-w-xs text-center text-[11px] leading-relaxed text-warning-300">
             {error.message}
           </p>
         )}
@@ -104,50 +98,30 @@ export function WalletButton({ wallet }: WalletButtonProps) {
     );
   }
 
-  // disconnected (with or without an error) — show the message, not raw SDK text
+  // disconnected (with or without an error)
   return (
     <div className="flex flex-col items-center gap-2">
       <button
         type="button"
         onClick={() => void connect()}
-        className={`inline-flex min-h-11 items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all md:min-h-0 ${
+        className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-[13px] font-medium transition-all duration-200 ${
           error
-            ? "border border-red-500/40 bg-red-500/10 text-red-200 hover:bg-red-500/20"
-            : "bg-navy-600 text-white shadow-glow hover:bg-navy-500"
+            ? "border border-error-500/30 bg-error-500/10 text-error-300 hover:bg-error-500/15"
+            : "bg-accent-gradient text-white shadow-glow-sm hover:shadow-glow hover:brightness-110"
         }`}
       >
-        <WalletIcon />
+        <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M21 12V7H5a2 2 0 0 1 0-4h14v4" />
+          <path d="M3 5v14a2 2 0 0 0 2 2h16v-5" />
+          <path d="M18 12a2 2 0 0 0 0 4h4v-4Z" />
+        </svg>
         {error ? "Try again" : "Connect Wallet"}
       </button>
       {error && (
-        <p role="alert" className="max-w-xs text-center text-xs leading-relaxed text-red-300">
+        <p role="alert" className="max-w-xs text-center text-[11px] leading-relaxed text-error-300">
           {error.message}
         </p>
       )}
     </div>
-  );
-}
-
-function SpinnerIcon() {
-  return (
-    <svg
-      className="h-4 w-4 animate-spin text-ink-300"
-      viewBox="0 0 24 24"
-      fill="none"
-      aria-hidden="true"
-    >
-      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25" />
-      <path d="M4 12a8 8 0 0 1 8-8" stroke="currentColor" strokeWidth="4" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function WalletIcon() {
-  return (
-    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M21 12V7H5a2 2 0 0 1 0-4h14v4" />
-      <path d="M3 5v14a2 2 0 0 0 2 2h16v-5" />
-      <path d="M18 12a2 2 0 0 0 0 4h4v-4Z" />
-    </svg>
   );
 }

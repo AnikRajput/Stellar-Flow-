@@ -88,10 +88,7 @@ const MESSAGES: Record<Exclude<WalletErrorCode, "wrong-network">, string> = {
   unknown: "Couldn't connect your wallet. Please try again.",
 };
 
-/** Freighter's content script injects `window.freighter`; absence means not installed. */
-function isFreighterInstalled(): boolean {
-  return typeof window !== "undefined" && "freighter" in window;
-}
+
 
 export function useWallet(): UseWalletReturn {
   const [address, setAddress] = useState<string | null>(null);
@@ -99,13 +96,6 @@ export function useWallet(): UseWalletReturn {
   const [error, setError] = useState<WalletError | null>(null);
 
   const connect = useCallback(async () => {
-    if (!isFreighterInstalled()) {
-      setAddress(null);
-      setStatus("disconnected");
-      setError({ code: "not-installed", message: MESSAGES["not-installed"] });
-      return;
-    }
-
     setStatus("connecting");
     setError(null);
 
@@ -117,7 +107,7 @@ export function useWallet(): UseWalletReturn {
         setError(
           access.error.code === FREIGHTER_DECLINED_ERROR_CODE
             ? { code: "declined", message: MESSAGES.declined }
-            : { code: "unknown", message: MESSAGES.unknown },
+            : { code: "not-installed", message: MESSAGES["not-installed"] },
         );
         return;
       }
@@ -155,7 +145,7 @@ export function useWallet(): UseWalletReturn {
     } catch {
       setAddress(null);
       setStatus("disconnected");
-      setError({ code: "unknown", message: MESSAGES.unknown });
+      setError({ code: "not-installed", message: MESSAGES["not-installed"] });
     }
   }, []);
 
@@ -170,8 +160,6 @@ export function useWallet(): UseWalletReturn {
   // can still connect explicitly.
   useEffect(() => {
     let active = true;
-
-    if (!isFreighterInstalled()) return;
 
     void (async () => {
       try {

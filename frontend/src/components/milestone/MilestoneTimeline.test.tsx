@@ -1,13 +1,8 @@
 /**
- * MilestoneTimeline tests (Phase 14).
+ * MilestoneTimeline tests — updated for new premium design.
  *
- * Asserts the node visuals for each flow state — paid / submitted / locked
- * (Pending + Approved share the locked category) / disputed — via the
- * semantic dot classes, and that the connector fill tracks the real paid
- * value (exact stroops), not a count.
- *
- * The wallet is mocked to an address that is neither party, so no action
- * buttons render and nothing touches the transaction service.
+ * Asserts the node visuals for each flow state via the semantic dot classes,
+ * and that the connector fill tracks the real paid value.
  */
 
 import { render } from "@testing-library/react";
@@ -22,7 +17,7 @@ const VIEWER = `G${"V".repeat(55)}`;
 
 vi.mock("@/hooks/useWallet", () => ({
   useWallet: () => ({
-    address: VIEWER, // neither party → read-only timeline
+    address: VIEWER,
     status: "connected",
     connect: vi.fn(),
     disconnect: vi.fn(),
@@ -52,12 +47,12 @@ const milestones: Milestone[] = [
 
 /** Per-state expected dot tint (NODE_DOT_CLASSES in MilestoneTimeline). */
 const EXPECTED_DOT_TINT: Record<Milestone["status"], string> = {
-  paid: "border-emerald-500/50",
-  submitted: "border-amber-500/50",
-  approved: "border-navy-500/50", // locked
-  pending: "border-navy-500/50", // locked
-  disputed: "border-red-500/50",
-  cancelled: "border-ink-600",
+  paid: "border-success-500/50",
+  submitted: "border-warning-500/50",
+  approved: "border-accent-500/50", // locked
+  pending: "border-accent-500/50", // locked
+  disputed: "border-error-500/50",
+  cancelled: "border-border-default",
 };
 
 describe("MilestoneTimeline", () => {
@@ -83,7 +78,7 @@ describe("MilestoneTimeline", () => {
     );
 
     // 1 of 4 milestones paid at 25 XLM each → 25% of a 100 XLM project.
-    const fill = container.querySelector('[class*="bg-emerald-500/80"]');
+    const fill = container.querySelector('[class*="bg-success-500/80"]');
     expect(fill).not.toBeNull();
     expect((fill as HTMLElement).style.height).toBe("25%");
   });

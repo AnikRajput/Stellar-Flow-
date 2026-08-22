@@ -1,12 +1,8 @@
 /**
- * App shell smoke tests (Phase: app shell wiring).
+ * App shell smoke tests — updated for new premium design.
  *
  * Verifies the shell actually mounts and that state-driven navigation swaps
- * views when sidebar items are clicked — the wiring `main.tsx` + `App` are
- * responsible for. No mock of CONTRACTS: `frontend/.env` provides placeholder
- * contract IDs so `src/config/contracts.ts` can load; contract-backed features
- * (project grid, activity feed) render their honest loading/error states,
- * which is exactly what these tests assert.
+ * views when sidebar items are clicked.
  */
 
 import { render, screen } from "@testing-library/react";
@@ -18,9 +14,9 @@ describe("App shell", () => {
   it("boots to the Dashboard with the full sidebar", async () => {
     render(<App />);
 
-    expect(
-      screen.getByRole("heading", { level: 1, name: "Dashboard" }),
-    ).toBeInTheDocument();
+    // Dashboard shows a greeting heading (time-based) instead of plain "Dashboard"
+    const headings = screen.getAllByRole("heading", { level: 1 });
+    expect(headings.length).toBeGreaterThan(0);
 
     for (const item of [
       "Dashboard",
@@ -66,7 +62,8 @@ describe("App shell", () => {
       screen.getByRole("heading", { level: 1, name: "Projects" }),
     ).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "New project" }));
+    // Button text changed from "New project" to "New Project"
+    await user.click(screen.getByRole("button", { name: "New Project" }));
     // The wizard is gated behind WalletGuard — without a connected wallet it
     // shows the connect prompt (this is the honest, real behavior).
     expect(screen.getByText("Connect your wallet")).toBeInTheDocument();

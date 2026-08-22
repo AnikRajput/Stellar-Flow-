@@ -92,7 +92,7 @@ export function OpenDisputeModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-ink-950/70 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-surface-0/70 p-4 backdrop-blur-sm"
       role="presentation"
     >
       {/* Backdrop click closes (only when idle). */}
@@ -108,10 +108,10 @@ export function OpenDisputeModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="open-dispute-title"
-        className="relative w-full max-w-lg overflow-hidden rounded-2xl border border-ink-700 bg-ink-900 shadow-glow"
+        className="relative w-full max-w-lg overflow-hidden rounded-xl border border-border-default bg-surface-2 shadow-card animate-scale-in"
       >
-        <div className="flex items-center justify-between border-b border-ink-800 px-5 py-4">
-          <h2 id="open-dispute-title" className="text-base font-semibold text-ink-50">
+        <div className="flex items-center justify-between border-b border-border-subtle px-5 py-4">
+          <h2 id="open-dispute-title" className="text-base font-semibold text-text-primary">
             Open a dispute
           </h2>
           <button
@@ -119,26 +119,26 @@ export function OpenDisputeModal({
             onClick={onClose}
             disabled={busy}
             aria-label="Close"
-            className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-md p-1 text-ink-400 transition-colors hover:bg-ink-800 hover:text-ink-100 disabled:cursor-not-allowed disabled:opacity-40 md:min-h-0 md:min-w-0"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border-default p-1 text-text-tertiary transition-colors hover:bg-surface-3 hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
           >
             <CloseIcon className="h-5 w-5" />
           </button>
         </div>
 
         <div className="px-5 py-4">
-          <p className="text-sm text-ink-300">
+          <p className="text-[13px] text-text-secondary">
             Project{" "}
-            <span className="font-semibold text-ink-50">#{project.id}</span> ·{" "}
+            <span className="font-semibold text-text-primary">#{project.id}</span> ·{" "}
             Milestone{" "}
             <span className="font-semibold text-ink-50">
               {milestone.id} — {milestone.name}
             </span>{" "}
             ·{" "}
-            <span className="tabular-nums">
+            <span className="tabular-nums text-text-primary">
               {formatStroopsAsUnits(milestone.amount)} XLM
             </span>
           </p>
-          <p className="mt-1 text-xs leading-relaxed text-ink-400">
+          <p className="mt-1 text-[11px] leading-relaxed text-text-tertiary">
             Opening a dispute pauses the project and holds the milestone funds
             in escrow until the arbitrator resolves it. Only the client or
             freelancer of this project can open one — the contract enforces
@@ -147,7 +147,7 @@ export function OpenDisputeModal({
 
           <label
             htmlFor="dispute-reason"
-            className="mt-4 block text-xs font-medium uppercase tracking-wide text-ink-400"
+            className="mt-4 block text-[11px] font-medium uppercase tracking-wider text-text-tertiary"
           >
             Reason
           </label>
@@ -160,20 +160,20 @@ export function OpenDisputeModal({
             maxLength={REASON_MAX_LENGTH}
             rows={4}
             placeholder="Describe what went wrong with this milestone…"
-            className="mt-1.5 w-full resize-y rounded-lg border border-ink-700 bg-ink-950/60 px-3 py-2.5 text-sm text-ink-100 placeholder:text-ink-600 focus:border-navy-500 focus:outline-none focus:ring-1 focus:ring-navy-500 disabled:cursor-not-allowed disabled:opacity-50"
+            className="mt-1.5 w-full resize-y rounded-lg border border-border-default bg-surface-3/60 px-3 py-2.5 text-[13px] text-text-primary placeholder:text-text-muted focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500/30 disabled:cursor-not-allowed disabled:opacity-50"
           />
-          <p className="mt-1 text-right text-[11px] tabular-nums text-ink-500">
+          <p className="mt-1 text-right text-[11px] tabular-nums text-text-muted">
             {reason.length}/{REASON_MAX_LENGTH}
           </p>
 
           {submitted && tx.state === "confirmed" && tx.hash && (
-            <p className="mt-2 text-xs leading-relaxed text-emerald-200">
+            <p className="mt-2 text-[11px] leading-relaxed text-success-300">
               Dispute opened on-chain.{" "}
               <a
                 href={explorerTxUrl(tx.hash)}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="underline decoration-emerald-500/40 underline-offset-2 hover:text-emerald-100"
+                className="underline decoration-success-500/40 underline-offset-2 hover:text-success-200"
               >
                 View transaction
               </a>
@@ -193,9 +193,9 @@ export function OpenDisputeModal({
           )}
         </div>
 
-        <div className="flex items-center justify-end gap-3 border-t border-ink-800 px-5 py-4">
+        <div className="flex items-center justify-end gap-3 border-t border-border-subtle px-5 py-4">
           {address && (
-            <p className="mr-auto truncate font-mono text-xs text-ink-500" title={address}>
+            <p className="mr-auto truncate font-mono text-[11px] text-text-muted" title={address}>
               {shortenAddress(address)}
             </p>
           )}
@@ -203,7 +203,7 @@ export function OpenDisputeModal({
             type="button"
             onClick={onClose}
             disabled={busy}
-            className="min-h-11 rounded-lg border border-ink-700 bg-ink-800 px-4 py-2 text-sm font-medium text-ink-100 transition-colors hover:bg-ink-700 disabled:cursor-not-allowed disabled:opacity-40 md:min-h-0"
+            className="min-h-11 rounded-lg border border-border-default bg-surface-3 px-4 py-2 text-[13px] font-medium text-text-secondary transition-colors hover:bg-surface-4 disabled:cursor-not-allowed disabled:opacity-40 md:min-h-0"
           >
             {submitted ? "Done" : "Cancel"}
           </button>
@@ -212,7 +212,7 @@ export function OpenDisputeModal({
               type="button"
               onClick={() => void openDispute()}
               disabled={!canSubmit}
-              className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-glow transition-all hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none md:min-h-0"
+              className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-error-500 px-4 py-2 text-[13px] font-medium text-white transition-all duration-200 hover:bg-error-400 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none md:min-h-0"
             >
               Open dispute
             </button>

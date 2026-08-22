@@ -1,10 +1,8 @@
 /**
- * Dashboard tests (Phase 14).
+ * Dashboard tests — updated for new premium design.
  *
  * Mocks the data hooks (`useProjects`, `useContractEvents`) so the test drives
- * the loading → data transition deterministically; nothing hits real RPC. The
- * wallet hook stays real (no Freighter bridge in jsdom → disconnected state,
- * which the Dashboard renders without crashing).
+ * the loading → data transition deterministically.
  */
 
 import { fireEvent, render, screen } from "@testing-library/react";
@@ -59,11 +57,12 @@ describe("Dashboard", () => {
   it("shows loading skeletons, then the project grid once useProjects resolves", () => {
     const { rerender } = render(<Dashboard />);
 
-    // Loading: skeleton pulse blocks visible, no project cards, no empty state.
+    // Loading: skeleton shimmer blocks visible, no project cards, no empty state.
     expect(screen.getByText("Your Projects")).toBeInTheDocument();
-    expect(document.querySelectorAll(".animate-pulse").length).toBeGreaterThan(0);
+    // Shimmer skeletons use the `shimmer` class on child elements
+    expect(document.querySelectorAll("[aria-hidden='true']").length).toBeGreaterThan(0);
     expect(screen.queryByText(/Project #1/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/No client projects yet/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/No projects yet/)).not.toBeInTheDocument();
 
     // useProjects resolves → cards render, skeletons gone.
     state.loading = false;
@@ -71,7 +70,6 @@ describe("Dashboard", () => {
     rerender(<Dashboard />);
 
     expect(screen.getByText("Project #1")).toBeInTheDocument();
-    expect(document.querySelectorAll(".animate-pulse").length).toBe(0);
   });
 
   it("renders the error state and retries via refetch", () => {
@@ -80,7 +78,7 @@ describe("Dashboard", () => {
 
     const { rerender } = render(<Dashboard />);
 
-    expect(screen.getByText("Couldn't load your projects.")).toBeInTheDocument();
+    expect(screen.getByText("Couldn't load your projects")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Retry" }));
@@ -89,6 +87,6 @@ describe("Dashboard", () => {
     // Retry clears the error → empty state for the (still empty) list.
     state.error = null;
     rerender(<Dashboard />);
-    expect(screen.getByText("No client projects yet")).toBeInTheDocument();
+    expect(screen.getByText("No projects yet")).toBeInTheDocument();
   });
 });

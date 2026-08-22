@@ -163,10 +163,10 @@ export function Disputes({ onNavigate }: DisputesProps) {
       <main className="min-w-0 flex-1 px-6 pt-8 pb-24 md:px-10 md:py-8">
         <header className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-ink-50">
+            <h1 className="text-xl font-bold tracking-tight text-text-primary">
               Disputes
             </h1>
-            <p className="mt-1 text-sm text-ink-400">
+            <p className="mt-1 text-sm text-text-secondary">
               Cases you're a party to, and every case you can arbitrate.
             </p>
           </div>
@@ -202,9 +202,9 @@ export function Disputes({ onNavigate }: DisputesProps) {
                 {readFailed && (
                   <div
                     role="alert"
-                    className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-500/25 bg-amber-500/5 px-4 py-3"
+                    className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-warning-500/20 bg-warning-500/5 px-4 py-3"
                   >
-                    <p className="text-xs leading-relaxed text-amber-200/90">
+                    <p className="text-[11px] leading-relaxed text-warning-300/90">
                       Some dispute details couldn't be loaded (project/milestone
                       reads failed). Disputes opened by the other party may be
                       missing until these reads succeed.
@@ -212,7 +212,7 @@ export function Disputes({ onNavigate }: DisputesProps) {
                     <button
                       type="button"
                       onClick={() => setReadAttempt((attempt) => attempt + 1)}
-                      className="inline-flex items-center gap-2 rounded-lg border border-ink-700 bg-ink-800 px-3 py-1.5 text-xs font-semibold text-ink-100 transition-colors hover:bg-ink-700"
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-border-default bg-surface-3 px-3 py-1.5 text-[11px] font-medium text-text-secondary transition-all duration-200 hover:border-border-strong hover:bg-surface-4 hover:text-text-primary"
                     >
                       <RetryIcon className="h-3.5 w-3.5" />
                       Retry loading details
@@ -220,7 +220,7 @@ export function Disputes({ onNavigate }: DisputesProps) {
                   </div>
                 )}
 
-                <p className="mt-6 text-xs leading-relaxed text-ink-500">
+                <p className="mt-6 text-[11px] leading-relaxed text-text-muted">
                   Disputes are reconstructed from escrow contract events.
                   Cases older than the recent history window aren't listed, and
                   an open case's dispute id is derived from event order — the
@@ -393,13 +393,13 @@ function decodeMilestoneRecord(value: unknown): Milestone {
 
 function EmptyState({ isArbitrator }: { isArbitrator: boolean }) {
   return (
-    <div className="rounded-2xl border border-dashed border-ink-700 p-10 text-center">
-      <p className="text-sm font-medium text-ink-200">
+    <div className="rounded-xl border border-dashed border-border-default p-10 text-center">
+      <p className="text-sm font-medium text-text-secondary">
         {isArbitrator
           ? "No disputes in the recent history window"
           : "No disputes yet"}
       </p>
-      <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-ink-400">
+      <p className="mx-auto mt-1 max-w-md text-[11px] leading-relaxed text-text-tertiary">
         {isArbitrator
           ? "Every case the escrow emitted appears here for arbitration."
           : "Disputes opened from a submitted milestone appear here, plus every case you can arbitrate."}
@@ -429,7 +429,7 @@ function RetryIcon({ className }: { className?: string }) {
 /** Mirrors the card layout so loading doesn't shift the grid. */
 function DisputeCardSkeleton() {
   return (
-    <div className="rounded-2xl border border-ink-800 bg-ink-900/60 p-5">
+    <div className="rounded-xl border border-border-subtle bg-surface-2/60 p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="space-y-2">
           <Skeleton className="h-4 w-44 rounded-md" />

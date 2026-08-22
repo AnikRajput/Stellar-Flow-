@@ -38,9 +38,9 @@ interface ResolveDisputeControlsProps {
 // while restoring the original desktop height; `flex-1 sm:flex-none` stretches
 // them full-width on mobile.
 const RELEASE_BUTTON_CLASS =
-  "inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-200 transition-colors hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-40 md:min-h-0 md:flex-none";
+  "inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-lg border border-success-500/20 bg-success-500/10 px-3 py-1.5 text-xs font-medium text-success-300 transition-colors hover:bg-success-500/15 disabled:cursor-not-allowed disabled:opacity-40 md:min-h-0 md:flex-none";
 const REFUND_BUTTON_CLASS =
-  "inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs font-semibold text-amber-200 transition-colors hover:bg-amber-500/20 disabled:cursor-not-allowed disabled:opacity-40 md:min-h-0 md:flex-none";
+  "inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-lg border border-warning-500/20 bg-warning-500/10 px-3 py-1.5 text-xs font-medium text-warning-300 transition-colors hover:bg-warning-500/15 disabled:cursor-not-allowed disabled:opacity-40 md:min-h-0 md:flex-none";
 
 export function ResolveDisputeControls({
   dispute,
@@ -85,17 +85,17 @@ export function ResolveDisputeControls({
   }
 
   return (
-    <div className="mt-4 rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
-      <p className="text-xs font-semibold uppercase tracking-wide text-amber-200">
+    <div className="mt-4 rounded-xl border border-warning-500/20 bg-warning-500/5 p-4">
+      <p className="text-[11px] font-semibold uppercase tracking-wider text-warning-300">
         Arbitrator actions
       </p>
-      <p className="mt-1 text-xs leading-relaxed text-ink-400">
+      <p className="mt-1 text-[11px] leading-relaxed text-text-tertiary">
         You are the escrow's arbitrator (factory address). Resolving releases
         the disputed milestone payment to the freelancer or refunds it to the
         client — this moves real funds on-chain.
       </p>
       {!dispute.disputeIdAuthoritative && (
-        <p className="mt-2 text-xs leading-relaxed text-amber-300/80">
+        <p className="mt-2 text-[11px] leading-relaxed text-warning-300/80">
           This case's dispute id is derived from recent event order (the opened
           event doesn't carry it). If the case predates the history window, the
           escrow will reject the wrong id in simulation.

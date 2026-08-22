@@ -1,17 +1,8 @@
 /**
- * SidebarNav responsive-frame tests (Phase 15).
+ * SidebarNav responsive-frame tests — updated for new premium design.
  *
- * The nav swaps between the desktop sidebar (≥768px) and a mobile top bar +
- * fixed bottom tab bar (<768px) based on `matchMedia`. jsdom has no
- * matchMedia, so these tests install a stub and flip `matches` to lock the
- * frame under test:
- *
- *   - matches=true  → desktop sidebar, no bottom tab bar
- *   - matches=false → bottom tab bar + top bar, no sidebar `<aside>`
- *
- * Asserting the bottom bar matters because it is otherwise never rendered in
- * jsdom (the hook falls back to the desktop frame when matchMedia is
- * missing), so a regression there would go unnoticed.
+ * Desktop (≥768px): sidebar with all nav items.
+ * Mobile (<768px): top bar + fixed bottom tab bar with main nav items only.
  */
 
 import { fireEvent, render, screen } from "@testing-library/react";
@@ -24,6 +15,14 @@ const NAV_ITEMS = [
   "Activity",
   "Disputes",
   "Settings",
+] as const;
+
+/** Main nav items that appear in the mobile bottom bar. */
+const MOBILE_BOTTOM_ITEMS = [
+  "Dashboard",
+  "Projects",
+  "Activity",
+  "Disputes",
 ] as const;
 
 const originalMatchMedia = window.matchMedia;
@@ -74,18 +73,18 @@ describe("SidebarNav", () => {
 
     // No squeezed sidebar.
     expect(document.querySelector("aside")).toBeNull();
-    // Bottom tab bar with all five items.
+    // Bottom tab bar with main items.
     const bottomBar = document.querySelector("nav.fixed");
     expect(bottomBar).not.toBeNull();
-    for (const item of NAV_ITEMS) {
+    // Settings is NOT in the mobile bottom bar (it's in the sidebar bottom group)
+    for (const item of MOBILE_BOTTOM_ITEMS) {
       expect(screen.getByRole("button", { name: item })).toBeInTheDocument();
     }
     // The active item is flagged for assistive tech.
     expect(
       screen.getByRole("button", { name: "Activity" }),
     ).toHaveAttribute("aria-current", "page");
-    // The mobile frame keeps its brand bar (brand text is split across
-    // nested spans, so match the header's full text content).
+    // The mobile frame keeps its brand bar.
     const topBar = document.querySelector("header");
     expect(topBar).not.toBeNull();
     expect(topBar).toHaveTextContent("StellarFlow");
